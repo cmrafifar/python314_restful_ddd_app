@@ -1,14 +1,30 @@
+
 services:
   api:
     build:
       context: .
+      dockerfile: Dockerfile
+
     ports:
       - "127.0.0.1:8000:8000"
+
     environment:
       APP_ENVIRONMENT: development
       APP_DEBUG: "true"
+
+      APP_DB_HOST: mysql
+      APP_DB_PORT: "3306"
+      APP_DB_NAME: bookstore
+      APP_DB_USER: bookstore
+      APP_DB_PASSWORD: development_password
+
     volumes:
       - ./src:/app/src:ro,z
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
     command:
       - uv
       - run
@@ -20,3 +36,30 @@ services:
       - --port
       - "8000"
       - --reload
+
+  mysql:
+    image: mysql:8.4
+
+    environment:
+      MYSQL_DATABASE: bookstore
+      MYSQL_USER: bookstore
+      MYSQL_PASSWORD: development_password
+      MYSQL_ROOT_PASSWORD: development_root_password
+
+    ports:
+      - "127.0.0.1:3307:3306"
+
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - mysqladmin ping -h 127.0.0.1 --silent
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  mysql_data:
+
