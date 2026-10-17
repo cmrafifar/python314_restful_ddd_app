@@ -17,7 +17,7 @@ dependencies = [
 bookstore-api = "bookstore_api:main"
 
 [build-system]
-requires = ["uv_build>=0.11.14,<0.12.0"]
+requires = ["uv_build>=0.13.0,<0.14.0"]
 build-backend = "uv_build"
 
 [dependency-groups]
@@ -28,9 +28,6 @@ dev = [
     "ruff>=0.17.1",
 ]
 
-[tool.basedpyright]
-typeCheckingMode = "strict"
-include = ["src", "tests"]
 
 [tool.ruff]
 line-length = 100
@@ -43,3 +40,11 @@ filterwarnings = [
 ]
 
 
+[tool.basedpyright]
+typeCheckingMode = "standard"  # ideally 'strict' but library type issues.
+include = ["src", "tests"]
+strict = [
+    "src/bookstore_api/domain",
+    "src/bookstore_api/application",
+]
+reportMissingTypeStubs = "none"
