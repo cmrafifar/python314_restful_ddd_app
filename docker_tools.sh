@@ -1,12 +1,15 @@
 #!/bin/bash
 
+
 function docker_validate_compose() {
   podman compose config
 }
 
+
 function docker_up_build() {
   podman compose up --build  -d 
 }
+
 
 function docker_test_mysql_connection() {
 	podman compose exec api uv run --no-dev python -c '
@@ -22,3 +25,38 @@ function docker_test_mysql_connection() {
 	engine.dispose()
 	'
 }
+
+
+function docker_migrations_generate() {
+  local migration_message="$1"
+  if [ -z "$migration_message" ]; then
+    echo "argument 1 required: migration message" >&2
+    return 1;
+  fi
+
+  export APP_DB_HOST=127.0.0.1 \
+  && export APP_DB_PORT=3307 \
+  && export APP_DB_NAME=bookstore \
+  && export APP_DB_USER=bookstore \
+  && export APP_DB_PASSWORD=development_password \
+  && uv run alembic revision --autogenerate -m "${migration_message}"
+}
+
+
+function docker_migrations_apply() {
+  uv run alembic upgrade head
+  
+  uv run alembic current
+
+  uv run alembic history --verbose
+}
+
+
+function docker_migrations_show_versions() {
+  podman compose exec mysql \
+  mysql -u bookstore -pdevelopment_password bookstore \
+  -e "SELECT * FROM alembic_version;"
+}
+
+
+
