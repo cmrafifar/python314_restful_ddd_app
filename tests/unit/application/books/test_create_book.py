@@ -7,11 +7,13 @@ from bookstore_api.application.books.create_book import (
 )
 from bookstore_api.domain.books.isbn import ISBN
 from tests.fakes.book_repository import FakeBookRepository
+from tests.fakes.unit_of_work import FakeUnitOfWork
 
 
 def test_create_book() -> None:
     repository = FakeBookRepository()
-    service = CreateBookService(repository)
+    uow = FakeUnitOfWork(repository)
+    service = CreateBookService(lambda: uow)
 
     command = CreateBookCommand(
         isbn="9780132350884",
@@ -20,19 +22,20 @@ def test_create_book() -> None:
     )
 
     result = service.execute(command)
-
     book = repository.get_by_id(result.book_id)
 
     assert book is not None
-    assert book.id == result.book_id
     assert book.isbn == ISBN(command.isbn)
     assert book.title == command.title
     assert book.author == command.author
+    assert uow.committed is True
 
 
-def test_cannot_create_duplicate_book() -> None:
+def test_rejects_duplicate_isbn() -> None:
     repository = FakeBookRepository()
-    service = CreateBookService(repository)
+    service = CreateBookService(
+        lambda: FakeUnitOfWork(repository)
+    )
 
     command = CreateBookCommand(
         isbn="9780132350884",
@@ -42,7 +45,11 @@ def test_cannot_create_duplicate_book() -> None:
 
     service.execute(command)
 
+    second_uow = FakeUnitOfWork(repository)
+    duplicate_service = CreateBookService(lambda: second_uow)
+
     with pytest.raises(BookAlreadyExistsError):
-        service.execute(command)
+        duplicate_service.execute(command)
 
     assert len(repository.books) == 1
+    assert second_uow.committed is False
