@@ -2,7 +2,6 @@
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import pool
 
 from bookstore_api.config import get_settings
 from bookstore_api.infrastructure.persistence.base import Base

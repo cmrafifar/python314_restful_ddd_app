@@ -1,4 +1,23 @@
-#!/bin/bash
+#!/bin/env bash
+
+set -o pipefail
+
+
+function mylib_error() {
+  local msg="$1"
+  printf "\033[1;31m[ERROR]\033[0m ${msg}.\n"
+}
+
+function mylib_success() {
+  local msg="$1"
+  printf "\033[32m[SUCCESS]\033[0m ${msg}.\n"
+}
+
+
+function goto_path() {
+  local path="${1:-}"
+  (cd "$HOME/github-repos/cmrafifar/python314_restful_ddd_app/$path" && mylib_success $(pwd)) || (mylib_error "failed to navigate to path")
+}
 
 
 function docker_validate_compose() {
