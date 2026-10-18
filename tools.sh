@@ -16,7 +16,8 @@ function mylib_success() {
 
 function goto_path() {
   local path="${1:-}"
-  (cd "$HOME/github-repos/cmrafifar/python314_restful_ddd_app/$path" && mylib_success $(pwd)) || (mylib_error "failed to navigate to path")
+  cd "$HOME/github-repos/cmrafifar/python314_restful_ddd_app/$path" || (mylib_error "failed to navigate to path" && return 1)
+  mylib_success "$(pwd)"
 }
 
 
