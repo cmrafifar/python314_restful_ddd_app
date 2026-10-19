@@ -28,6 +28,8 @@ dev = [
     "basedpyright>=1.40.2",
     "httpx>=0.28.1",
     "pytest>=9.1.1",
+    "pytest-rich>=0.3.0",
+    "rich>=15.0.0",
     "ruff>=0.17.1",
 ]
 

@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     db_port: int = 3306
     db_name: str = "bookstore"
     db_user: str = "bookstore"
-    db_password: str = ""
+    db_password: str
 
 
 def get_settings() -> Settings:
