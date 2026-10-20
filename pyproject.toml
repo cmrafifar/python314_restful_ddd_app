@@ -49,7 +49,7 @@ filterwarnings = [
 venvPath = "."
 venv = ".venv"
 typeCheckingMode = "standard"  # ideally 'strict' but library type issues.
-include = ["src", "tests"]
+include = ["src", "tests", "scripts"]
 strict = [
     "src/bookstore_api/domain",
     "src/bookstore_api/application",

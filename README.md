@@ -29,8 +29,10 @@ Run from the repository root with Python 3.14+ and `uv` installed:
 
 ```bash
 uv sync --frozen
-export APP_DB_PASSWORD=development_password
-uv run uvicorn bookstore_api.main:app --reload
+cp .env.example .env
+chmod 600 .env
+# Replace the password placeholders in .env before continuing.
+uv run --env-file .env uvicorn bookstore_api.main:app --reload
 ```
 
 Open `/health` or the generated API documentation at `/docs` on `http://127.0.0.1:8000`.
@@ -43,6 +45,7 @@ To start the API and MySQL through containers:
 podman compose up --build -d
 ```
 
+First configure `.env` using [.env.example](.env.example); see [development](docs/development.md#local-api-and-database).
 Compose starts services but does not apply database migrations. Follow the [migration guide](migrations/README.md) before exercising persistence.
 
 ## Tests
@@ -54,10 +57,12 @@ uv run pytest
 No database or credentials are required. MySQL tests are skipped unless explicitly enabled:
 
 ```bash
-uv run --env-file .env.test pytest --run-integration
+./scripts/test_integration.py
 ```
 
-See [testing](docs/testing.md#mysql-integration-setup) for the one-time database and `.env.test` setup.
+First configure `.env.test` using [.env.test.example](.env.test.example). The command starts a
+separate MySQL service, applies migrations, checks schema drift, and runs the persistence tests.
+See [testing](docs/testing.md#mysql-integration-setup) for setup and lifecycle details.
 
 ## Documentation
 

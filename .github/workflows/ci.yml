@@ -63,12 +63,11 @@ jobs:
       - name: Install locked dependencies
         run: uv sync --locked
       - name: Run functional tests
-        run: uv run --locked pytest tests/test_health.py
+        run: uv run --locked pytest tests/integration/api/test_health.py
 
   integration:
     name: Integration tests
-    # Disabled unless the repository variable RUN_INTEGRATION_TESTS is 'true'.
-    if: ${{ !github.event.pull_request.draft && vars.RUN_INTEGRATION_TESTS == 'true' }}
+    if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     services:
@@ -110,6 +109,8 @@ jobs:
         run: uv sync --locked
       - name: Apply test database migrations
         run: uv run --locked alembic upgrade head
+      - name: Check for schema drift
+        run: uv run --locked alembic check
       - name: Run integration tests
         run: uv run --locked pytest tests/integration --run-integration
 

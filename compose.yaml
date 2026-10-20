@@ -16,7 +16,7 @@ services:
       APP_DB_PORT: "3306"
       APP_DB_NAME: bookstore
       APP_DB_USER: bookstore
-      APP_DB_PASSWORD: development_password
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Set APP_DB_PASSWORD in .env}
 
     volumes:
       - ./src:/app/src:ro,z
@@ -43,8 +43,8 @@ services:
     environment:
       MYSQL_DATABASE: bookstore
       MYSQL_USER: bookstore
-      MYSQL_PASSWORD: development_password
-      MYSQL_ROOT_PASSWORD: development_root_password
+      MYSQL_PASSWORD: ${APP_DB_PASSWORD:?Set APP_DB_PASSWORD in .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
 
     ports:
       - "127.0.0.1:3307:3306"

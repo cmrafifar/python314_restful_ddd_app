@@ -11,7 +11,7 @@ Read when adding tests or validating behavior. Use pytest files named `test_*.py
 | [`tests/specs/`](../tests/specs) | Collaboration specifications using autospecced repository and unit-of-work mocks |
 | [`tests/unit/infrastructure/`](../tests/unit/infrastructure) | Mapper behavior and ORM metadata checks without a live database |
 | [`tests/integration/persistence/`](../tests/integration/persistence) | MySQL repository, rollback, uniqueness, and durable-commit tests; explicitly enabled |
-| [`tests/test_health.py`](../tests/test_health.py) | Functional test of HTTP health behavior using FastAPI `TestClient` |
+| [`tests/integration/api/test_health.py`](../tests/integration/api/test_health.py) | HTTP health behavior using FastAPI `TestClient`, without a database |
 | [`tests/fakes/`](../tests/fakes) | Reusable in-memory adapters |
 
 Prefer fakes for observable application outcomes. Use interaction assertions where the interaction is a contract, such as committing only on success. Do not assert every internal call or mirror implementation steps without a behavioral reason.
@@ -74,29 +74,30 @@ does not cancel the other. Ruff continues to install the full project and develo
 |---|---|---|
 | `Specs` | `uv run --locked pytest tests/specs` | Enabled |
 | `Unit tests` | `uv run --locked pytest tests/unit` | Enabled |
-| `Integration tests` | `uv run --locked pytest tests/integration --run-integration` | Disabled |
-| `Functional tests` | `uv run --locked pytest tests/test_health.py` | Disabled |
+| `Integration tests` | `uv run --locked pytest tests/integration --run-integration` | Enabled |
+| `Functional tests` | `uv run --locked pytest tests/integration/api/test_health.py` | Disabled |
 | `BasedPyright` | `uv run --locked basedpyright` | Enabled |
 | `Ruff` | `uv run --locked ruff check .` and `uv run --locked ruff format --check .` | Enabled |
 
 Both Ruff checks report violations without modifying files. The current functional suite consists
-of the health endpoint test in `tests/test_health.py`.
+of the health endpoint test in `tests/integration/api/test_health.py`; the integration job also
+runs this test as part of `tests/integration`.
 
-Integration and functional jobs remain fully defined. To enable either, open repository Settings >
-Secrets and variables > Actions > Variables and add `RUN_INTEGRATION_TESTS` or `RUN_FUNCTIONAL_TESTS`
-with the exact value `true`. Missing variables keep these jobs disabled. Set a variable to `false`
-or delete it to disable its job again. The non-draft requirement still applies when enabled.
+Integration tests run for every non-draft pull request; `RUN_INTEGRATION_TESTS` is no longer used.
+Functional tests remain optional. To enable them, open repository Settings > Secrets and
+variables > Actions > Variables and set `RUN_FUNCTIONAL_TESTS` to exactly `true`. Delete it or
+set it to `false` to disable the functional job.
 
 The integration job starts a disposable MySQL 8.4 service with a dedicated `bookstore_test` database
-and applies Alembic migrations before running tests. Its committed credentials are test-only values
-for that service; no repository secrets or `.env.test` are needed. Disabled jobs start no runners
-or service containers.
+and runs `alembic upgrade head` followed by `alembic check` before running tests. Its committed
+credentials belong only to that disposable service; no repository secrets or `.env.test` are
+needed. Draft pull requests start no integration runner or service container.
 
 After committing and opening a non-draft pull request, check the run in the repository's Actions tab.
 To block merges when an enabled job fails, configure a branch protection rule for the default branch
 under Settings > Branches. Enable required pull requests and require `Specs`, `Unit tests`,
 `BasedPyright`, and `Ruff`. Replace any previous required `Pytest` check with these names.
-Add integration and functional checks when enabling those jobs. Workflow files run checks; branch
+Also require `Integration tests`, and add functional checks when enabling that job. Workflow files run checks; branch
 protection enforces their results at merge time.
 
 ### Comparing CI performance and cost
@@ -131,51 +132,65 @@ reuse may reduce setup time, but verify the timings before claiming a speed or c
 
 Integration tests require `--run-integration`. When enabled, missing configuration is an error rather than a skip. [`conftest.py`](../tests/integration/persistence/conftest.py) rejects non-MySQL URLs and any database name other than `bookstore_test` before opening a connection.
 
-One-time local setup:
+The local integration stack is defined in `compose.test.yaml`, separate from the development
+stack. It uses MySQL 8.4 on `127.0.0.1:3308`, database/user `bookstore_test`, and its own named
+volume. Keep its MySQL image version and server settings aligned with development and CI.
+The test user's privileges are limited to `bookstore_test`.
 
-```bash
-podman compose up -d mysql
-podman compose exec mysql mysql -u root -p
-```
-
-Enter the local root password when prompted. Create a dedicated database and user in the MySQL shell, replacing the password placeholder with a local test password:
-
-```sql
-CREATE DATABASE IF NOT EXISTS bookstore_test;
-CREATE USER IF NOT EXISTS 'bookstore_test'@'%' IDENTIFIED BY 'replace_with_local_test_password';
-GRANT ALL PRIVILEGES ON bookstore_test.* TO 'bookstore_test'@'%';
-```
-
-This user has privileges only on the test database. Compose publishes MySQL on localhost port 3307 and creates only the development database automatically.
+One-time local configuration:
 
 ```bash
 cp .env.test.example .env.test
 chmod 600 .env.test
 ```
 
-Edit `.env.test` with the matching test password in both password fields. URL-encode special characters in the URL credentials. Keep `APP_DB_NAME=bookstore_test`. This file is ignored by Git; never put real credentials in the committed example.
+Replace `APP_DB_PASSWORD` and `TEST_MYSQL_ROOT_PASSWORD` with distinct local passwords. A value
+from `uv run python -c 'import secrets; print(secrets.token_hex(24))'` works without quoting or
+interpolation concerns. The ignored `.env.test` is plaintext; do not commit credentials.
 
-Apply reviewed migrations to the test database, with settings scoped to that command:
-
-```bash
-uv run --env-file .env.test alembic upgrade head
-```
-
-Alembic reads `APP_DB_*`, while tests read `BOOKSTORE_TEST_DATABASE_URL`. Keep both pointed at the same test database. Exported shell variables override values from `--env-file`; use a shell without conflicting `APP_DB_*` or `BOOKSTORE_TEST_DATABASE_URL` exports, especially before migrations.
-
-For each subsequent full run:
+Run from the repository root:
 
 ```bash
-uv run --env-file .env.test pytest --run-integration
+./scripts/test_integration.py
 ```
 
-To run only the MySQL tests:
+This executable uses `uv` to load `.env.test` and the locked Python environment. It validates the
+local test target before starting containers or applying migrations, starts the standalone
+`bookstore-integration` Compose project, and waits for an authenticated connection. It then runs
+the shared Alembic migrations, checks for model/schema differences, and runs the integration
+suite. A failed prerequisite stops the sequence. The service remains available for later runs.
+
+Compose and Alembic use the same `APP_DB_PASSWORD`. The runner builds
+`BOOKSTORE_TEST_DATABASE_URL` from `APP_DB_*`, including URL-encoding its password, so there is
+only one test password to maintain. Remove the old URL entry when migrating an existing
+`.env.test`; port 3307 changes to 3308. Exported shell variables override `uv --env-file` values;
+conflicting targets and URLs are rejected before migrations.
+
+The shared migration history is the schema source of truth. Do not create test tables with
+`metadata.create_all()` or maintain a separate SQL schema. `alembic check` detects differences
+supported by Alembic autogeneration; migration review and behavior tests remain necessary.
+Fresh CI databases verify that the migration history can build the schema from scratch.
+
+Inspect or stop only the test stack:
 
 ```bash
-uv run --env-file .env.test pytest tests/integration --run-integration
+podman compose --env-file .env.test -p bookstore-integration -f compose.test.yaml logs mysql-test
+podman compose --env-file .env.test -p bookstore-integration -f compose.test.yaml stop mysql-test
 ```
 
-CI should provision the test database, apply migrations, and run with `--run-integration`; a passing default run does not verify MySQL. See [development](development.md) and the [migration guide](../migrations/README.md) for migration details. Fixtures do not create the schema.
+MySQL initializes credentials only on a fresh volume. Changing `.env.test` does not rotate an
+existing user's password. To rebuild the disposable test database, the following command
+**deletes all test-stack data**; it does not select the development stack:
+
+```bash
+podman compose --env-file .env.test -p bookstore-integration -f compose.test.yaml down --volumes
+```
+
+The next runner invocation provisions a new database and reapplies all migrations. Direct pytest
+invocations still accept `BOOKSTORE_TEST_DATABASE_URL` for CI or externally provisioned MySQL,
+but they do not provision the database, run migrations, or check drift. A passing default pytest
+run does not verify MySQL. See [development](development.md) and the
+[migration guide](../migrations/README.md) for migration details.
 
 The session fixture opens an outer transaction and uses savepoints so application commits can occur inside test isolation. It rolls back the outer transaction afterward. This is not a schema cleanup mechanism: MySQL DDL can implicitly commit. Keep schema changes outside per-test transactions.
 
