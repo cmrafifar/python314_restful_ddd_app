@@ -13,6 +13,20 @@ uv build
 
 Use [testing](testing.md) for pytest and static checks. Dependency declarations and tool settings live in [pyproject.toml](../pyproject.toml); resolved versions live in [uv.lock](../uv.lock).
 
+## Manual security scan
+
+The [Security workflow](../.github/workflows/security.yml) runs only when manually triggered. It installs locked runtime and development dependencies, exports `uv.lock` to a temporary pip requirements file, and runs Snyk Open Source against that environment. The export adapts uv's lockfile to Snyk's [documented Python CLI support](https://docs.snyk.io/supported-languages/supported-languages-list/python/snyk-cli-for-python); it does not add a second dependency file to the repository.
+
+Before the first run:
+
+1. Get an API token from your Snyk account. See [Snyk's token instructions](https://github.com/snyk/actions#getting-your-snyk-token).
+2. In GitHub, open **Settings > Secrets and variables > Actions** and create a repository secret named `SNYK_TOKEN`.
+3. Merge the workflow into the repository's default branch so GitHub exposes the manual trigger.
+
+To scan, open **Actions > Security > Run workflow**, select the branch, and click **Run workflow**. Repository write access is required. See [GitHub's manual workflow guide](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow).
+
+Results appear in the workflow logs. Vulnerabilities of any severity fail the scan; missing credentials or scan errors also fail the workflow. This workflow checks Python dependencies, including transitive dependencies; it does not scan application source code or container images.
+
 ## Settings
 
 [`Settings`](../src/bookstore_api/config.py) reads environment variables with the `APP_` prefix. Unknown settings are ignored. No `env_file` is configured, so `.env` is not loaded automatically. [.env.example](../.env.example) currently lists only application name, environment, and debug settings.
