@@ -12,6 +12,7 @@ Read when adding tests or validating behavior. Use pytest files named `test_*.py
 | [`tests/unit/infrastructure/`](../tests/unit/infrastructure) | Mapper behavior and ORM metadata checks without a live database |
 | [`tests/integration/persistence/`](../tests/integration/persistence) | MySQL repository, rollback, uniqueness, and durable-commit tests; explicitly enabled |
 | [`tests/integration/api/test_health.py`](../tests/integration/api/test_health.py) | HTTP health behavior using FastAPI `TestClient`, without a database |
+| [`tests/integration/api/test_books_api.py`](../tests/integration/api/test_books_api.py) | Create-book route, configured service with fake units of work, validation, and engine cleanup without a database |
 | [`tests/fakes/`](../tests/fakes) | Reusable in-memory adapters |
 
 Prefer fakes for observable application outcomes. Use interaction assertions where the interaction is a contract, such as committing only on success. Do not assert every internal call or mirror implementation steps without a behavioral reason.

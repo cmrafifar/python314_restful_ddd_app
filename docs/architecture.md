@@ -28,7 +28,8 @@ These are project rules. Existing incomplete code is not a precedent for bypassi
 | [`application/books/`](../src/bookstore_api/application/books) | Create command, result, service, and repository port |
 | [`application/unit_of_work.py`](../src/bookstore_api/application/unit_of_work.py) | Transaction boundary port |
 | [`infrastructure/persistence/`](../src/bookstore_api/infrastructure/persistence) | SQLAlchemy models, mapping, engine/session factories, repository, and unit of work |
-| [`main.py`](../src/bookstore_api/main.py) | FastAPI factory and health route; intended composition root |
+| [`api/books/`](../src/bookstore_api/api/books) | Book HTTP schemas, router, and service dependency |
+| [`main.py`](../src/bookstore_api/main.py) | FastAPI factory, composition root, and health route |
 | [`config.py`](../src/bookstore_api/config.py) | Environment-backed settings |
 | [`migrations/`](../migrations) | Database schema evolution |
 
@@ -36,7 +37,11 @@ The implemented repository is in `infrastructure/persistence/repositories/sqlalc
 
 ## Current create-book flow
 
-The use case is called directly by tests. There is no create-book HTTP route or production wiring for this flow yet.
+`POST /api/v1/books` calls the use case through the HTTP adapter. `create_app` builds an engine
+from settings, a session factory, and a `CreateBookService` whose unit-of-work factory creates
+a fresh `SqlAlchemyUnitOfWork` for each execution. The service lives on
+`app.state.create_book_service`; the FastAPI dependency retrieves it for the route. Creating
+the engine does not connect to MySQL. Application shutdown disposes its connection pool.
 
 1. A caller supplies a `CreateBookCommand` to `CreateBookService.execute`.
 2. The service constructs `ISBN`, validating its representation and checksum before opening a unit of work.
@@ -47,7 +52,9 @@ The use case is called directly by tests. There is no create-book HTTP route or 
 
 Sources: [service](../src/bookstore_api/application/books/create_book.py), [domain rules](domain/books.md), and [collaboration specifications](../tests/specs/application/books/test_create_book_spec.py).
 
-A future HTTP adapter should parse its request, call this application boundary, and map the result or known errors to HTTP. It must not query SQLAlchemy or duplicate book invariants.
+The HTTP adapter parses its request, builds the command, and returns the created UUID with
+HTTP 201. It maps `BookAlreadyExistsError` to HTTP 409. See [API conventions](api-conventions.md)
+for the current validation limits.
 
 ## Transactions and persistence
 
