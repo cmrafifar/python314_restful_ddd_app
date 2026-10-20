@@ -88,6 +88,34 @@ rotate an existing database user's password. When adopting this configuration wi
 volume, use the existing credentials in `.env` or rotate the users explicitly with `ALTER USER`.
 Do not delete the development volume to resolve a credential mismatch.
 
+## MySQL data persistence
+
+The MySQL service mounts the named volume `mysql_data` at `/var/lib/mysql`, where MySQL
+stores its database files. Podman manages this volume separately from the container, so
+the data does not appear in a directory inside this repository. A replacement container
+reuses the existing data when Compose mounts the same volume.
+
+With the default project name for this checkout, the volume is named
+`python314_restful_ddd_app_mysql_data`. Find its host storage location with:
+
+```bash
+podman volume ls
+podman volume inspect python314_restful_ddd_app_mysql_data --format '{{.Mountpoint}}'
+```
+
+For rootless Podman on Linux, the location is typically
+`~/.local/share/containers/storage/volumes/python314_restful_ddd_app_mysql_data/_data`.
+Use the inspection command for the actual location; storage configuration can change it.
+
+| Operation | Effect on database data |
+|---|---|
+| Restart, rebuild, or recreate the services | Preserves data in the existing volume |
+| `podman compose down` followed by `podman compose up -d` | Preserves and reuses the volume |
+| `podman compose down -v` | Deletes the volume and its database data |
+| Change the Compose project name | Uses a different volume; the original volume remains |
+
+A persistent volume is not a backup. Keep database backups separately when the data matters.
+
 ## Migrations
 
 The [migration guide](../migrations/README.md) owns detailed migration procedures and MySQL limitations. Alembic is already initialized; do not initialize it again.
