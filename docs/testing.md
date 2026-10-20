@@ -11,7 +11,7 @@ Read when adding tests or validating behavior. Use pytest files named `test_*.py
 | [`tests/specs/`](../tests/specs) | Collaboration specifications using autospecced repository and unit-of-work mocks |
 | [`tests/unit/infrastructure/`](../tests/unit/infrastructure) | Mapper behavior and ORM metadata checks without a live database |
 | [`tests/integration/persistence/`](../tests/integration/persistence) | MySQL repository, rollback, uniqueness, and durable-commit tests; explicitly enabled |
-| [`tests/test_health.py`](../tests/test_health.py) | HTTP health behavior using FastAPI `TestClient` |
+| [`tests/test_health.py`](../tests/test_health.py) | Functional test of HTTP health behavior using FastAPI `TestClient` |
 | [`tests/fakes/`](../tests/fakes) | Reusable in-memory adapters |
 
 Prefer fakes for observable application outcomes. Use interaction assertions where the interaction is a contract, such as committing only on success. Do not assert every internal call or mirror implementation steps without a behavioral reason.
@@ -56,21 +56,40 @@ Report commands actually run, their results, and material checks omitted. Existi
 
 ## Continuous integration
 
-[GitHub Actions](../.github/workflows/ci.yml) runs on pushes and pull requests and supports manual
-runs. Its independent `Pytest`, `BasedPyright`, and `Ruff` jobs use the Python version in `.python-version`
-and install dependencies with `uv sync --locked`, which rejects an outdated lockfile.
+[GitHub Actions](../.github/workflows/ci.yml) runs jobs only for non-draft pull requests: when opened,
+updated with new commits, reopened, or marked ready for review. Draft pull request events can create
+a workflow entry, but every job is skipped. Standalone pushes and manual runs do not trigger CI.
+All jobs use the Python version in `.python-version` and install dependencies with
+`uv sync --locked`, which rejects an outdated lockfile.
 
-The pytest job starts a disposable MySQL 8.4 service with a dedicated `bookstore_test` database,
-applies Alembic migrations, and runs `uv run --locked pytest --run-integration`. Its committed
-credentials are test-only values for that service; no repository secrets or `.env.test` are needed.
-The type-checking job runs `uv run --locked basedpyright` without database configuration.
-The Ruff job runs `uv run --locked ruff check .` and `uv run --locked ruff format --check .`.
-Both checks report violations without modifying files.
+| Job | Command | Default |
+|---|---|---|
+| `Specs` | `uv run --locked pytest tests/specs` | Enabled |
+| `Unit tests` | `uv run --locked pytest tests/unit` | Enabled |
+| `Integration tests` | `uv run --locked pytest tests/integration --run-integration` | Disabled |
+| `Functional tests` | `uv run --locked pytest tests/test_health.py` | Disabled |
+| `BasedPyright` | `uv run --locked basedpyright` | Enabled |
+| `Ruff` | `uv run --locked ruff check .` and `uv run --locked ruff format --check .` | Enabled |
 
-After committing and pushing the workflow, check its first run in the repository's Actions tab.
-To block merges when any job fails, configure a branch protection rule for the default branch
-under Settings > Branches. Enable required pull requests and require the `Pytest`, `BasedPyright`, and `Ruff`
-status checks. Workflow files run checks; branch protection enforces their results at merge time.
+Both Ruff checks report violations without modifying files. The current functional suite consists
+of the health endpoint test in `tests/test_health.py`.
+
+Integration and functional jobs remain fully defined. To enable either, open repository Settings >
+Secrets and variables > Actions > Variables and add `RUN_INTEGRATION_TESTS` or `RUN_FUNCTIONAL_TESTS`
+with the exact value `true`. Missing variables keep these jobs disabled. Set a variable to `false`
+or delete it to disable its job again. The non-draft requirement still applies when enabled.
+
+The integration job starts a disposable MySQL 8.4 service with a dedicated `bookstore_test` database
+and applies Alembic migrations before running tests. Its committed credentials are test-only values
+for that service; no repository secrets or `.env.test` are needed. Disabled jobs start no runners
+or service containers.
+
+After committing and opening a non-draft pull request, check the run in the repository's Actions tab.
+To block merges when an enabled job fails, configure a branch protection rule for the default branch
+under Settings > Branches. Enable required pull requests and require `Specs`, `Unit tests`,
+`BasedPyright`, and `Ruff`. Replace any previous required `Pytest` check with these names.
+Add integration and functional checks when enabling those jobs. Workflow files run checks; branch
+protection enforces their results at merge time.
 
 ## MySQL integration setup
 
