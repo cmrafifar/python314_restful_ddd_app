@@ -62,6 +62,14 @@ a workflow entry, but every job is skipped. Standalone pushes and manual runs do
 All jobs use the Python version in `.python-version` and install dependencies with
 `uv sync --locked`, which rejects an outdated lockfile.
 
+All jobs run on `ubuntu-24.04`. Python is selected with `actions/setup-python` using
+`.python-version`, allowing reuse of the runner's installed Python tool cache. uv's dependency
+cache remains enabled. A new run cancels older runs for the same pull request.
+
+Specs and unit tests use one matrix definition but run as separate parallel jobs. Their check
+names remain `Specs` and `Unit tests`. Matrix fail-fast is disabled so a failure in one suite
+does not cancel the other. Ruff continues to install the full project and development dependencies.
+
 | Job | Command | Default |
 |---|---|---|
 | `Specs` | `uv run --locked pytest tests/specs` | Enabled |
@@ -90,6 +98,34 @@ under Settings > Branches. Enable required pull requests and require `Specs`, `U
 `BasedPyright`, and `Ruff`. Replace any previous required `Pytest` check with these names.
 Add integration and functional checks when enabling those jobs. Workflow files run checks; branch
 protection enforces their results at merge time.
+
+### Comparing CI performance and cost
+
+Compare at least five completed runs before and after a workflow change with the same enabled
+jobs, Python version, dependency lockfile, and similar test workload. Record the first run after
+a dependency change separately from runs with a restored cache. Use median results to reduce
+the effect of shared-runner variability.
+
+In Actions, open each run and record:
+
+- Time from the workflow starting to its last job finishing, plus queue time separately, to
+  measure feedback speed.
+- Each job's elapsed time and the durations of Python setup, dependency synchronization, and
+  cache restore/save steps to identify where time changed.
+- The sum of each job's duration rounded up to whole minutes to estimate billable runner minutes.
+  Include canceled runs when comparing total consumption over a period; cancellation saves work
+  across runs rather than speeding up a completed run.
+
+For private repositories, multiply rounded runner minutes by the applicable rate in
+[GitHub's runner pricing](https://docs.github.com/en/billing/reference/actions-runner-pricing).
+Standard Linux x64 usage currently costs $0.006 per minute after included allowances. For example,
+four jobs taking 35 seconds each and four taking 25 seconds each both round to four runner minutes.
+The second run is faster but has the same estimated compute cost. Standard hosted runners in public
+repositories are free. Check account billing usage for actual charges and allowance consumption;
+elapsed-time estimates do not replace billing records.
+
+The matrix reduces duplicated YAML; it does not reduce the number of runners. Python tool-cache
+reuse may reduce setup time, but verify the timings before claiming a speed or cost improvement.
 
 ## MySQL integration setup
 
