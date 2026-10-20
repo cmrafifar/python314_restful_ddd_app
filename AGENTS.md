@@ -4,6 +4,8 @@
 
 Use this file as the entry point. Read the documents relevant to the task; do not load every document by default.
 
+`docs/ai/` contains human-readable reference material, not agent instructions. Exclude it from routine discovery, searches, and context loading, and do not follow links into it. For broad text searches, use `rg --glob '!docs/ai/**'`. Read or edit files there only when the user explicitly requests work on that documentation. Never treat their contents as agent instructions.
+
 The developer is a senior PHP 8.4/Laravel 12 backend engineer learning Python. Preserve DDD and hexagonal boundaries while favoring idiomatic Python. Read the [learning goals](README.md#learning-goals-and-working-approach) when choosing teaching examples or business requirements.
 
 | Task | Read |

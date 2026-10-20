@@ -8,8 +8,7 @@ class UnitOfWork(Protocol):
     books: BookRepository
 
     # Enter context manager
-    def __enter__(self) -> Self:
-        ...
+    def __enter__(self) -> Self: ...
 
     # Exit context manager
     def __exit__(
@@ -17,9 +16,6 @@ class UnitOfWork(Protocol):
         exc_type: type[BaseException] | None,
         exc_value: BaseException | None,
         traceback: TracebackType | None,
-    ) -> None:
-        ...
+    ) -> None: ...
 
-    def commit(self) -> None:
-        ...
-
+    def commit(self) -> None: ...

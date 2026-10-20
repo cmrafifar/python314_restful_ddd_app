@@ -1,4 +1,3 @@
-
 from uuid import UUID
 
 from sqlalchemy import select
@@ -24,9 +23,7 @@ class SqlAlchemyBookRepository(BookRepository):
         return BookMapper.to_domain(model)
 
     def get_by_isbn(self, isbn: ISBN) -> Book | None:
-        statement = select(BookModel).where(
-            BookModel.isbn == isbn.value
-        )
+        statement = select(BookModel).where(BookModel.isbn == isbn.value)
 
         model = self._session.scalar(statement)
 
@@ -39,4 +36,3 @@ class SqlAlchemyBookRepository(BookRepository):
         model = BookMapper.to_model(book)
 
         self._session.add(model)
-

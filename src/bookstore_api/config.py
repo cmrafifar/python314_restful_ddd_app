@@ -18,4 +18,5 @@ class Settings(BaseSettings):
 
 
 def get_settings() -> Settings:
-    return Settings()
+    # BaseSettings loads required fields from the environment at runtime.
+    return Settings()  # pyright: ignore[reportCallIssue]

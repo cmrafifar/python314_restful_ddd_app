@@ -33,9 +33,7 @@ def test_create_book() -> None:
 
 def test_rejects_duplicate_isbn() -> None:
     repository = FakeBookRepository()
-    service = CreateBookService(
-        lambda: FakeUnitOfWork(repository)
-    )
+    service = CreateBookService(lambda: FakeUnitOfWork(repository))
 
     command = CreateBookCommand(
         isbn="9780132350884",

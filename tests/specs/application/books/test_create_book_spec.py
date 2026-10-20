@@ -1,4 +1,3 @@
-
 from unittest.mock import create_autospec
 
 import pytest
@@ -35,9 +34,7 @@ def test_it_creates_and_commits_a_book() -> None:
     result = service.execute(command)
 
     # Assert
-    repository.get_by_isbn.assert_called_once_with(
-        ISBN(command.isbn)
-    )
+    repository.get_by_isbn.assert_called_once_with(ISBN(command.isbn))
     repository.add.assert_called_once()
 
     book = repository.add.call_args.args[0]
@@ -80,4 +77,3 @@ def test_it_does_not_commit_when_isbn_already_exists() -> None:
     repository.add.assert_not_called()
     uow.commit.assert_not_called()
     uow.__exit__.assert_called_once()
-

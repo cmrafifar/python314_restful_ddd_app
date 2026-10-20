@@ -1,5 +1,5 @@
-
 from types import TracebackType
+from typing import Self
 
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -17,7 +17,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         self._session_factory = session_factory
         self._session: Session | None = None
 
-    def __enter__(self) -> "SqlAlchemyUnitOfWork":
+    def __enter__(self) -> Self:
         if self._session is not None:
             raise RuntimeError("Unit of Work is already active")
 
@@ -51,4 +51,3 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         finally:
             session.close()
             self._session = None
-

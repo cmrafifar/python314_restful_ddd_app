@@ -12,13 +12,10 @@ class ISBN:
         digits = [int(char) for char in self.value]
 
         checksum = sum(
-            digit * (1 if index % 2 == 0 else 3)
-            for index, digit in enumerate(digits[:12])
+            digit * (1 if index % 2 == 0 else 3) for index, digit in enumerate(digits[:12])
         )
 
         check_digit = (10 - checksum % 10) % 10
 
         if check_digit != digits[12]:
             raise ValueError("Invalid ISBN-13 checksum")
-
-

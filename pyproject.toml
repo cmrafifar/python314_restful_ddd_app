@@ -46,6 +46,8 @@ filterwarnings = [
 
 
 [tool.basedpyright]
+venvPath = "."
+venv = ".venv"
 typeCheckingMode = "standard"  # ideally 'strict' but library type issues.
 include = ["src", "tests"]
 strict = [

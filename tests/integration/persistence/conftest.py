@@ -8,13 +8,14 @@ from sqlalchemy.orm import Session, sessionmaker
 
 
 @pytest.fixture(scope="session")
-def mysql_engine() -> Iterator[Engine]:
+def mysql_engine(request: pytest.FixtureRequest) -> Iterator[Engine]:
+    if not request.config.getoption("--run-integration"):
+        pytest.skip("MySQL tests require --run-integration; see docs/testing.md")
+
     database_url = os.environ.get("BOOKSTORE_TEST_DATABASE_URL")
 
     if database_url is None:
-        pytest.fail(
-            "BOOKSTORE_TEST_DATABASE_URL must be configured"
-        )
+        pytest.fail("BOOKSTORE_TEST_DATABASE_URL must be configured")
 
     url = make_url(database_url)
 
@@ -22,9 +23,7 @@ def mysql_engine() -> Iterator[Engine]:
         pytest.fail("Integration tests require MySQL")
 
     if url.database != "bookstore_test":
-        pytest.fail(
-            "Refusing to run against a non-test database"
-        )
+        pytest.fail("Refusing to run against a non-test database")
 
     engine = create_engine(
         url,

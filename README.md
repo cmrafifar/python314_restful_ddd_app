@@ -45,6 +45,20 @@ podman compose up --build -d
 
 Compose starts services but does not apply database migrations. Follow the [migration guide](migrations/README.md) before exercising persistence.
 
+## Tests
+
+```bash
+uv run pytest
+```
+
+No database or credentials are required. MySQL tests are skipped unless explicitly enabled:
+
+```bash
+uv run --env-file .env.test pytest --run-integration
+```
+
+See [testing](docs/testing.md#mysql-integration-setup) for the one-time database and `.env.test` setup.
+
 ## Documentation
 
 Start with [AGENTS.md](AGENTS.md) for task-specific reading and validation commands.
@@ -55,6 +69,7 @@ Start with [AGENTS.md](AGENTS.md) for task-specific reading and validation comma
 - [Testing](docs/testing.md): test boundaries, doubles, and database requirements.
 - [API conventions](docs/api-conventions.md): existing HTTP behavior and endpoint guidance.
 - [Development](docs/development.md): configuration, tools, containers, and troubleshooting.
+- [Codex how-tos](docs/ai/codex.md): human reference for command approvals and practical agent setup; excluded from routine agent context.
 - [Decision records](docs/decisions/README.md): how to record consequential design decisions.
 
 Tool settings in [pyproject.toml](pyproject.toml), formatting in [.editorconfig](.editorconfig), and dependencies in [uv.lock](uv.lock) remain authoritative for their respective concerns.

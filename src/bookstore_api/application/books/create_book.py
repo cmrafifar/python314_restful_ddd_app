@@ -1,4 +1,3 @@
-
 from collections.abc import Callable
 from dataclasses import dataclass
 from uuid import UUID
@@ -32,9 +31,7 @@ class CreateBookService:
             existing = uow.books.get_by_isbn(isbn)
 
             if existing is not None:
-                raise BookAlreadyExistsError(
-                    f"Book with ISBN {isbn.value} already exists"
-                )
+                raise BookAlreadyExistsError(f"Book with ISBN {isbn.value} already exists")
 
             book = Book.create(
                 isbn=isbn,
@@ -46,4 +43,3 @@ class CreateBookService:
             uow.commit()
 
             return CreateBookResult(book_id=book.id)
-
