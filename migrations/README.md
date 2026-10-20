@@ -52,21 +52,26 @@ Inside the Podman Compose network, MySQL is accessible as `mysql:3306`.
 
 ### Configure database environment variables
 
-When executing Alembic from the Fedora host:
+Configure the ignored `.env` using `.env.example` as described in
+[development](../docs/development.md#local-api-and-database). Host settings use port 3307.
+Load this file explicitly when executing Alembic from the Fedora host:
 
 ```bash
-export APP_DB_HOST=127.0.0.1
-export APP_DB_PORT=3307
-export APP_DB_NAME=bookstore
-export APP_DB_USER=bookstore
-export APP_DB_PASSWORD=development_password
+uv run --env-file .env alembic current
 ```
 
 These credentials are for local development only. Do not commit production credentials or secrets.
 
 Our `migrations/env.py` obtains database settings through `get_settings()` and passes them to the shared SQLAlchemy database engine factory.
 
-**Important:** Environment variable changes only apply to the shell session where they are exported. Avoid assuming that variables configured inside a Podman container are automatically available on the host.
+The commands below assume the intended `APP_DB_*` settings are exported. Alternatively, add
+`--env-file .env` after `uv run` for development migration commands. Exported variables take
+precedence over file values. Container environment variables are not automatically available
+on the host.
+
+Integration tests use the same migration history in a separate MySQL service. Run
+`./scripts/test_integration.py` to provision that service, migrate `bookstore_test`, check drift,
+and run its tests. See [testing](../docs/testing.md#mysql-integration-setup) for `.env.test` setup.
 
 ## 3. Initialize Alembic
 

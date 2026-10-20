@@ -79,4 +79,12 @@ function docker_migrations_show_versions() {
 }
 
 
+function docker_mysql_test_start() {
+  podman compose --env-file .env.test \
+  -p bookstore-integration \
+  -f compose.test.yaml \
+  up -d mysql-test
+}
+
+
 

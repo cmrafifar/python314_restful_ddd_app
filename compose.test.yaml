@@ -1,0 +1,23 @@
+# Standalone test stack: it never shares the development database volume or network.
+services:
+  mysql-test:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: bookstore_test
+      MYSQL_USER: bookstore_test
+      MYSQL_PASSWORD: ${APP_DB_PASSWORD:?Set APP_DB_PASSWORD in .env.test}
+      MYSQL_ROOT_PASSWORD: ${TEST_MYSQL_ROOT_PASSWORD:?Set TEST_MYSQL_ROOT_PASSWORD in .env.test}
+    ports:
+      - "127.0.0.1:3308:3306"
+    volumes:
+      - mysql_test_data:/var/lib/mysql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - mysqladmin ping -h 127.0.0.1 --silent
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  mysql_test_data:
