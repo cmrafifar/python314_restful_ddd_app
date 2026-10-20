@@ -1,33 +1,29 @@
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
-from functools import partial
 
+from dishka import Provider
+from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
 
 from bookstore_api.api.books.router import router as books_router
-from bookstore_api.application.books.create_book import (
-    CreateBookService,
-)
 from bookstore_api.config import Settings, get_settings
-from bookstore_api.infrastructure.persistence.database import (
-    create_db_engine,
-    create_session_factory,
-)
-from bookstore_api.infrastructure.persistence.sqlalchemy_unit_of_work import (
-    SqlAlchemyUnitOfWork,
-)
+from bookstore_api.di.container import create_container
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None,
+    *,
+    provider_overrides: Sequence[Provider] = (),
+) -> FastAPI:
     config = settings if settings is not None else get_settings()
-    engine = create_db_engine(config)
+    container = create_container(config, *provider_overrides)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         try:
             yield
         finally:
-            engine.dispose()
+            container.close()
 
     app = FastAPI(
         title=config.name,
@@ -36,17 +32,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
     )
 
-    # Use the Engine already constructed from your Settings.
-    session_factory = create_session_factory(engine)
-
-    uow_factory = partial(
-        SqlAlchemyUnitOfWork,
-        session_factory,
-    )
-
-    app.state.create_book_service = CreateBookService(
-        uow_factory=uow_factory,
-    )
+    setup_dishka(container, app)
     app.include_router(books_router)
 
     @app.get("/health", tags=["system"])

@@ -1,8 +1,6 @@
+from dishka.integrations.fastapi import DishkaSyncRoute, FromDishka
 from fastapi import APIRouter, HTTPException, status
 
-from bookstore_api.api.books.dependencies import (
-    CreateBookServiceDep,
-)
 from bookstore_api.api.books.schemas import (
     BookResponse,
     CreateBookRequest,
@@ -12,9 +10,10 @@ from bookstore_api.application.books.commands import (
 )
 from bookstore_api.application.books.create_book import (
     BookAlreadyExistsError,
+    CreateBookService,
 )
 
-router = APIRouter(prefix="/api/v1/books", tags=["books"])
+router = APIRouter(prefix="/api/v1/books", tags=["books"], route_class=DishkaSyncRoute)
 
 
 @router.post(
@@ -24,7 +23,7 @@ router = APIRouter(prefix="/api/v1/books", tags=["books"])
 )
 def create_book(
     request: CreateBookRequest,
-    service: CreateBookServiceDep,
+    service: FromDishka[CreateBookService],
 ) -> BookResponse:
     command = CreateBookCommand(
         isbn=request.isbn,

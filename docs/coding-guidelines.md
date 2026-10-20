@@ -32,7 +32,7 @@ Preserve the roles of routes, application services, domain entities, and persist
 - Use `Protocol` for structural port contracts; adapters need not inherit a port solely to satisfy its type contract.
 - Prefer ordinary functions for stateless behavior when a class would only wrap one function without adding a useful responsibility.
 - Use dataclasses for suitable core data records and Pydantic models for boundary validation. Keep framework models outside the core.
-- Use explicit constructor or factory wiring. Keep FastAPI dependency injection at the HTTP/composition boundary rather than introducing service location into use cases.
+- Use ordinary constructor dependencies in application and domain code. Register services through Dishka providers in `di/`; keep `FromDishka` annotations at HTTP boundaries. Do not resolve containers inside use cases. See [dependency injection](architecture.md#dependency-injection) for registration and lifetime rules.
 - Keep SQLAlchemy models separate from domain entities. Do not assume Eloquent-style active-record behavior or automatic persistence of domain-object mutations.
 - Use context managers for resource ownership and pytest fixtures for test setup. Explain their lifecycle implications when introducing them.
 - Choose synchronous or asynchronous execution based on the complete I/O path and learning objective. Do not add `async` merely because FastAPI supports it.

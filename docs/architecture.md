@@ -28,8 +28,9 @@ These are project rules. Existing incomplete code is not a precedent for bypassi
 | [`application/books/`](../src/bookstore_api/application/books) | Create command, result, service, and repository port |
 | [`application/unit_of_work.py`](../src/bookstore_api/application/unit_of_work.py) | Transaction boundary port |
 | [`infrastructure/persistence/`](../src/bookstore_api/infrastructure/persistence) | SQLAlchemy models, mapping, engine/session factories, repository, and unit of work |
-| [`api/books/`](../src/bookstore_api/api/books) | Book HTTP schemas, router, and service dependency |
-| [`main.py`](../src/bookstore_api/main.py) | FastAPI factory, composition root, and health route |
+| [`api/books/`](../src/bookstore_api/api/books) | Book HTTP schemas and Dishka-enabled router |
+| [`di/`](../src/bookstore_api/di) | Composition root: container construction and modular dependency providers |
+| [`main.py`](../src/bookstore_api/main.py) | FastAPI factory, container integration and shutdown, and health route |
 | [`config.py`](../src/bookstore_api/config.py) | Environment-backed settings |
 | [`migrations/`](../migrations) | Database schema evolution |
 
@@ -37,11 +38,13 @@ The implemented repository is in `infrastructure/persistence/repositories/sqlalc
 
 ## Current create-book flow
 
-`POST /api/v1/books` calls the use case through the HTTP adapter. `create_app` builds an engine
-from settings, a session factory, and a `CreateBookService` whose unit-of-work factory creates
-a fresh `SqlAlchemyUnitOfWork` for each execution. The service lives on
-`app.state.create_book_service`; the FastAPI dependency retrieves it for the route. Creating
-the engine does not connect to MySQL. Application shutdown disposes its connection pool.
+`POST /api/v1/books` calls the use case through the HTTP adapter. `create_app` builds a Dishka
+container from settings and the registered providers. The router uses `DishkaSyncRoute` and
+requests `FromDishka[CreateBookService]`. Dishka constructs the service from its constructor
+annotations, supplying a unit-of-work factory that creates a fresh `SqlAlchemyUnitOfWork` for
+each execution. Dependencies are created lazily. Creating the engine does not connect to MySQL;
+a health-only request does not construct it. Application shutdown closes the container and
+disposes any engine it created.
 
 1. A caller supplies a `CreateBookCommand` to `CreateBookService.execute`.
 2. The service constructs `ISBN`, validating its representation and checksum before opening a unit of work.
@@ -55,6 +58,37 @@ Sources: [service](../src/bookstore_api/application/books/create_book.py), [doma
 The HTTP adapter parses its request, builds the command, and returns the created UUID with
 HTTP 201. It maps `BookAlreadyExistsError` to HTTP 409. See [API conventions](api-conventions.md)
 for the current validation limits.
+
+## Dependency injection
+
+[`di/container.py`](../src/bookstore_api/di/container.py) is the explicit provider registry and
+container factory. It registers the supplied `Settings` instance as application context, then
+combines the persistence and books providers. This package may import every layer because it
+owns assembly; application and domain code must not import Dishka or resolve services themselves.
+
+Providers group related registrations, similar to Laravel service providers:
+
+- [`PersistenceProvider`](../src/bookstore_api/di/providers/persistence.py) owns engine creation
+  and disposal, session-factory construction, and the `Callable[[], UnitOfWork]` binding.
+- [`BooksProvider`](../src/bookstore_api/di/providers/books.py) registers `CreateBookService`
+  using constructor autowiring. Add book use cases here; add other cohesive providers when
+  additional features require them. Register each provider explicitly in `create_container`.
+
+Settings, engine, session factory, unit-of-work factory, and the stateless create service use
+`Scope.APP`. A fresh unit of work and session belong to each use-case execution, not the HTTP
+request scope. The unit of work still constructs its repositories so they share its session.
+Dishka does not control commits or construct domain entities from request data.
+
+HTTP routers use `DishkaSyncRoute` with direct `FromDishka[ServiceType]` parameters. Avoid custom
+dependency annotation aliases and per-service lookups through `Request` or `app.state`.
+`setup_dishka` manages the container reference internally. Use a synchronous container while
+persistence uses synchronous SQLAlchemy and PyMySQL; the integration opens request scopes, and
+the application lifespan closes the root container.
+
+For HTTP tests, `create_app(provider_overrides=[...])` accepts Dishka providers whose replacement
+registrations specify `override=True`. Overrides belong to that application's container and must
+be supplied before construction. Unit tests continue passing dependencies directly to constructors.
+See [decision 0002](decisions/0002-dishka-dependency-injection.md) for alternatives and rationale.
 
 ## Transactions and persistence
 
