@@ -20,6 +20,32 @@ Composition root -> concrete adapters and application
 
 These are project rules. Existing incomplete code is not a precedent for bypassing them.
 
+## Library integration
+
+Use each framework or library's documented, idiomatic patterns within the required dependency
+boundaries. FastAPI supplies the HTTP framework; Dishka, SQLAlchemy, and Alembic supply separate
+capabilities. The application needs integration code to connect them, but that code should remain
+small and specific to actual application requirements.
+
+When planning features or explaining unfamiliar behavior:
+
+- Check the installed version and official documentation before designing a custom mechanism.
+  Reuse supported integrations and lifecycle hooks where they meet the requirement.
+- Explain which behavior comes from Python, which comes from the library, and why the documented
+  pattern fits. An unfamiliar convention alone is not a reason to replace it with an abstraction.
+- Keep application assembly in the composition root and library details in the appropriate adapters.
+  Do not introduce a custom container API, provider discovery system, decorators, or lifecycle
+  framework when the chosen libraries already supply the needed behavior.
+- Add a custom abstraction only for a concrete requirement or architectural boundary that the
+  documented patterns do not adequately serve. Explain the gap and tradeoff; record significant
+  departures in a decision record.
+
+For example, Dishka's [documented generator providers](https://dishka.readthedocs.io/en/stable/provider/provide.html)
+support resource setup and finalization. The engine provider yields one `Engine`, then disposes it
+in `finally` when the application container closes. This is a Dishka lifecycle convention built on
+Python generators, not a custom resource-management protocol. Retain that pattern rather than
+adding a wrapper solely to hide `yield`.
+
 ## Current structure
 
 | Location | Responsibility |
@@ -69,7 +95,7 @@ owns assembly; application and domain code must not import Dishka or resolve ser
 Providers group related registrations, similar to Laravel service providers:
 
 - [`PersistenceProvider`](../src/bookstore_api/di/providers/persistence.py) owns engine creation
-  and disposal, session-factory construction, and the `Callable[[], UnitOfWork]` binding.
+  and disposal, session-factory construction, and the `UnitOfWorkFactory` binding.
 - [`BooksProvider`](../src/bookstore_api/di/providers/books.py) registers `CreateBookService`
   using constructor autowiring. Add book use cases here; add other cohesive providers when
   additional features require them. Register each provider explicitly in `create_container`.
@@ -78,6 +104,10 @@ Settings, engine, session factory, unit-of-work factory, and the stateless creat
 `Scope.APP`. A fresh unit of work and session belong to each use-case execution, not the HTTP
 request scope. The unit of work still constructs its repositories so they share its session.
 Dishka does not control commits or construct domain entities from request data.
+
+`application/unit_of_work.py` names the factory contract with
+`type UnitOfWorkFactory = Callable[[], UnitOfWork]`. Services and providers use that same alias;
+follow the [type annotation convention](coding-guidelines.md#type-annotations) for complex contracts.
 
 HTTP routers use `DishkaSyncRoute` with direct `FromDishka[ServiceType]` parameters. Avoid custom
 dependency annotation aliases and per-service lookups through `Request` or `app.state`.

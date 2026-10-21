@@ -1,10 +1,9 @@
-from collections.abc import Callable
 from unittest.mock import create_autospec, patch
 
 from sqlalchemy.orm import Session
 
 from bookstore_api.application.books.create_book import CreateBookService
-from bookstore_api.application.unit_of_work import UnitOfWork
+from bookstore_api.application.unit_of_work import UnitOfWorkFactory
 from bookstore_api.config import Settings
 from bookstore_api.di.container import create_container
 
@@ -25,7 +24,7 @@ def test_shared_service_creates_and_closes_a_session_per_unit_of_work() -> None:
             with container() as second_request:
                 assert second_request.get(CreateBookService) is first_service
 
-            factory = container.get(Callable[[], UnitOfWork])
+            factory = container.get(UnitOfWorkFactory)
             with factory() as first_uow:
                 first_uow.commit()
             with factory() as second_uow:

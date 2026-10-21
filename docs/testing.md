@@ -29,9 +29,25 @@ app = create_app(provider_overrides=[provider])
 ```
 
 This replaces the service only for that application. To exercise real service orchestration,
-override `Callable[[], UnitOfWork]` with a factory returning fake units of work instead. Use
+override `UnitOfWorkFactory` with a factory returning fake units of work instead. Use
 `TestClient` as a context manager so application shutdown closes the container and its resources.
 Application and domain tests still use direct constructor injection without a container.
+
+For a Python `type` alias such as `UnitOfWorkFactory`, register the override using a function with
+that return annotation, rather than `provides=UnitOfWorkFactory`:
+
+```python
+def provide_unit_of_work_factory() -> UnitOfWorkFactory:
+    return fake_unit_of_work_factory
+
+
+provider.provide(provide_unit_of_work_factory, override=True)
+```
+
+Dishka 1.10.1 expands the annotated return alias into registrations for both the alias and its
+underlying type. Constructor parameters resolve through the underlying type. Explicit
+`provides=UnitOfWorkFactory` alone does not perform that expansion and can leave the production
+factory active. The configured-service API test verifies that this override reaches the use case.
 
 Prefer fakes for observable application outcomes. Use interaction assertions where the interaction is a contract, such as committing only on success. Do not assert every internal call or mirror implementation steps without a behavioral reason.
 

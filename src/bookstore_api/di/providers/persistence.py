@@ -1,11 +1,11 @@
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from functools import partial
 
 from dishka import Provider, Scope, provide
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from bookstore_api.application.unit_of_work import UnitOfWork
+from bookstore_api.application.unit_of_work import UnitOfWorkFactory
 from bookstore_api.config import Settings
 from bookstore_api.infrastructure.persistence.database import (
     create_db_engine,
@@ -31,7 +31,5 @@ class PersistenceProvider(Provider):
         return create_session_factory(engine)
 
     @provide
-    def unit_of_work_factory(
-        self, session_factory: sessionmaker[Session]
-    ) -> Callable[[], UnitOfWork]:
+    def unit_of_work_factory(self, session_factory: sessionmaker[Session]) -> UnitOfWorkFactory:
         return partial(SqlAlchemyUnitOfWork, session_factory)

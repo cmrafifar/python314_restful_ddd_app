@@ -1,4 +1,3 @@
-from collections.abc import Callable
 from unittest.mock import create_autospec, patch
 from uuid import uuid4
 
@@ -9,7 +8,7 @@ from bookstore_api.application.books.create_book import (
     CreateBookResult,
     CreateBookService,
 )
-from bookstore_api.application.unit_of_work import UnitOfWork
+from bookstore_api.application.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from bookstore_api.main import create_app
 from tests.fakes.book_repository import FakeBookRepository
 from tests.fakes.unit_of_work import FakeUnitOfWork
@@ -68,10 +67,12 @@ def test_create_book_uses_configured_service() -> None:
     def unit_of_work_factory() -> UnitOfWork:
         return next(units_of_work)
 
+    def provide_unit_of_work_factory() -> UnitOfWorkFactory:
+        return unit_of_work_factory
+
     overrides = Provider(scope=Scope.APP)
     overrides.provide(
-        lambda: unit_of_work_factory,
-        provides=Callable[[], UnitOfWork],
+        provide_unit_of_work_factory,
         override=True,
     )
     app = create_app(provider_overrides=[overrides])

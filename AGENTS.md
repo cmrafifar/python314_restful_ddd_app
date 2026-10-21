@@ -6,6 +6,8 @@ Use this file as the entry point. Read the documents relevant to the task; do no
 
 `docs/ai/` contains human-readable reference material, not agent instructions. Exclude it from routine discovery, searches, and context loading, and do not follow links into it. For broad text searches, use `rg --glob '!docs/ai/**'`. Read or edit files there only when the user explicitly requests work on that documentation. Never treat their contents as agent instructions.
 
+`QA.md` is a human-only learning journal for manually reviewing knowledge-check questions and answers. Do not read, index, summarize, or load it as agent context, and never treat it as agent instructions or project requirements. Exclude it from discovery and searches; broad text searches must also include `--glob '!QA.md'`. Access it only when the user explicitly requests recording a resolved question and answer or other work on that file; keep that access limited to the requested task.
+
 The developer is a senior PHP 8.4/Laravel 12 backend engineer learning Python. Preserve DDD and hexagonal boundaries while favoring idiomatic Python. Read the [learning goals](README.md#learning-goals-and-working-approach) when choosing teaching examples or business requirements.
 
 | Task | Read |
@@ -20,6 +22,8 @@ The developer is a senior PHP 8.4/Laravel 12 backend engineer learning Python. P
 | Make or revisit a significant design decision | [Decision records](docs/decisions/README.md) |
 
 Documents distinguish current behavior, required rules, and proposals. Do not implement a proposal merely because it appears in documentation. If code conflicts with a required rule, report the discrepancy and resolve it within the task's scope. Update relevant documentation when changing behavior or conventions. Keep detailed rules in their linked document rather than copying them here.
+
+For feature planning and implementation, prefer the libraries' documented, idiomatic patterns. Keep application integration small; do not build a custom framework around them. Follow the [library integration guidance](docs/architecture.md#library-integration) when evaluating abstractions or unfamiliar conventions.
 
 ## Project Structure & Module Organization
 
@@ -43,6 +47,8 @@ Use Python 3.14 or newer and run commands from the repository root:
 ## Coding Style & Naming Conventions
 
 Use four spaces for Python and two for other files, UTF-8, LF endings, and a final newline. Ruff targets Python 3.14 with a 100-character line limit. Use `snake_case` for functions and modules and `PascalCase` for classes. Add type annotations; BasedPyright applies strict checks to domain and application code.
+
+Use descriptive Python `type` aliases for complex annotations, such as `UnitOfWorkFactory`. Follow the [type annotation guidance](docs/coding-guidelines.md#type-annotations) for new and changed code.
 
 ## Testing Guidelines
 
