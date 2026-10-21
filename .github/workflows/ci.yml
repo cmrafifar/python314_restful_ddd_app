@@ -67,7 +67,7 @@ jobs:
 
   integration:
     name: Integration tests
-    if: ${{ !github.event.pull_request.draft }}
+    if: ${{ !github.event.pull_request.draft && vars.RUN_INTEGRATION_TESTS == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     services:
