@@ -172,3 +172,59 @@ partial(SqlAlchemyUnitOfWork, session_factory)
 
 This binds the session factory argument in advance. Each subsequent call constructs a new
 `SqlAlchemyUnitOfWork`; entering its context creates the session.
+# Bookstore API — Architecture Knowledge Checks
+
+
+
+
+Python 3.14 • DDD • Hexagonal Architecture • MySQL 8.4 • SQLAlchemy 2.x • Unit of Work • Dishka
+
+Updated: 2026-10-21. This file records questions, the learner's actual answers (summarized faithfully unless quoted), evaluation, and unresolved questions. Extend it after each exchange; do not mark unanswered questions as answered.
+
+## Question 1 — Unit of Work and external payments
+
+**Scenario:** The purchase use case modifies books/orders in one SQLAlchemy session, charges an external payment provider, and commits the DB. Payment provider has idempotency keys but no distributed transactions. Endpoint can be retried.
+
+**Question:** Which practical consistency strategy is strongest? A) Treat whole service as atomic; B) charge after commit and compensate; C) atomically persist order plus payment-request outbox event, process asynchronously with idempotency/reconciliation; D) separate sessions and sequential commits.
+
+**Learner answer:** C.
+
+**Evaluation:** Correct. Transactional outbox commits DB state and work request atomically. Asynchronous execution with durable attempts, provider idempotency, retry and reconciliation avoids assuming distributed atomicity. Explicitly note failures after provider success and before local acknowledgement; idempotency-key retention is finite.
+
+**Follow-up (open):** Payment succeeds; worker crashes before recording PAID; retries 48h later after provider's 24h idempotency-key retention. How can the integration avoid duplicate charges and reconcile? No learner response recorded.
+
+## Question 2 — Inventory concurrency
+
+**Scenario:** MySQL InnoDB REPEATABLE READ. Two independent transactions load available=5, then reserve 4 and 3 respectively, using normal ORM updates without versions or explicit locks.
+
+**Question:** Choose and defend one of: A) SERIALIZABLE; B) SELECT ... FOR UPDATE; C) optimistic version check and fresh retry; D) atomic conditional decrement checked by affected-row count. Discuss contention and boundaries.
+
+**Learner answer:** C. Atomic SQL is ideal for the simple case, but specialized state updates can complicate evolving aggregate behavior. Optimistic locking is a practical trade-off: reload/re-execute on conflicts; bound retry attempts and allow application policy to determine when to retry or compensate. Pessimistic locking could work but learner was concerned about scaling and described it as 'locking tables.' Concurrency policy should be controlled in application layer rather than overly coupled to infrastructure.
+
+**Evaluation:** C is defensible. Corrected mistaken characterization of pessimistic locking: indexed SELECT FOR UPDATE typically locks index records/rows, not an exclusive table lock. Atomic conditional updates remain suitable when business invariants permit them. Separate domain invariant enforcement, application retry/transaction policy, and infrastructure version checks. New UoW/rollback is required after failed flush. Initial grade 8.5/10.
+
+## Question 2B — Optimistic locking vs idempotency
+
+**Scenario:** Same UoW adds Order and updates versioned Book; Order itself has no version. One transaction commits, another receives StaleDataError during book flush after possibly inserting an order in the session.
+
+**Question:** Does Book versioning alone prevent duplicate orders? Address flush ordering, rollback, retry and unique business intent/idempotency.
+
+**Learner answer:** 'Mostly' sufficient for inventory integrity, not request intent: duplicate requests for one customer intent might each reserve valid stock and create multiple orders. Need stable idempotency identity for customer intent, but constructing a deterministic key from request characteristics is ambiguous: two genuine orders could have identical attributes. Proposed considering business-defined time window but recognized that is risky. Business and engineering need to agree on intent semantics. Later emphasized that a persisted idempotency record naturally follows given stateless HTTP APIs. Explained that rollback/flush behavior was obvious and intentionally omitted.
+
+**Evaluation:** Fundamental architectural issue identified correctly. Do not deduct for omission of known rollback behavior. Avoid time-window heuristics and content-only deterministic idempotency keys. Prefer explicit, client-created operation/intent ID reused across retries, a request fingerprint to reject payload mismatch, durable status/result records, and DB uniqueness. Flush does not commit; failed transaction rollback removes inserted Order. Original grade 8/10, revised 9/10, and **final revised grade: 10/10 for Question 2B conceptual reasoning**. Learner clarified that the semantics of an intent must be defined jointly by business and engineering; the key MAY incorporate business, temporal, and technical attributes but need not be derived exclusively from any of them. The earlier deduction incorrectly attributed a content-derived deterministic-key requirement to the learner. A stable explicit operation ID remains one implementation option, not a correction to their principle. Implementation-level concerns (key ownership, uniqueness scope, retry horizon, payload fingerprint, atomic persistence) remain to be designed and tested; this does not undermine the conceptual answer. Initial Question 2 inventory-concurrency grade of 8.5/10 remains separate.
+
+## Question 3 — Concurrent idempotency-key creation (NOT YET STARTED)
+
+**Scenario:** idempotency_keys table has primary key idempotency_key, request_hash, nullable order_id, status. Two concurrent requests read no record; A inserts record and order and commits; B insert gets duplicate-key error.
+
+**Question:** Design recovery for B; consider whether to retry entire use case, retrieve existing result, or report conflict; handle an in-progress request and response loss; prove correctness with MySQL REPEATABLE READ and avoid second create_order().
+
+**Status:** Question was presented but the learner explicitly asked not to advance without permission. Do NOT evaluate or present Question 3 until learner approves.
+
+## Standing assessment rules
+
+- Senior/Staff-level realistic failure-mode questions; one at a time.
+- Never reveal the answer before the learner responds.
+- Evaluate the reasoning and technical precision; avoid grading down for omission of obvious details the learner understood.
+- **Always ask for explicit readiness before advancing to the next question or component.**
+- Record each question, learner answer, evaluation and revision in this file.

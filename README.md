@@ -77,6 +77,7 @@ Start with [AGENTS.md](AGENTS.md) for task-specific reading and validation comma
 - [API conventions](docs/api-conventions.md): existing HTTP behavior and endpoint guidance.
 - [Development](docs/development.md): configuration, tools, containers, and troubleshooting.
 - [Codex how-tos](docs/ai/codex.md): human reference for command approvals and practical agent setup; excluded from routine agent context.
+- [Learning notes](learnings/): for human eyes only; AI agents must ignore this directory unless explicitly asked to work on its files.
 - [Decision records](docs/decisions/README.md): how to record consequential design decisions.
 
 Tool settings in [pyproject.toml](pyproject.toml), formatting in [.editorconfig](.editorconfig), and dependencies in [uv.lock](uv.lock) remain authoritative for their respective concerns.
