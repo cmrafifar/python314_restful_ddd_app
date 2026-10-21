@@ -9,10 +9,45 @@ Read when adding tests or validating behavior. Use pytest files named `test_*.py
 | [`tests/unit/domain/`](../tests/unit/domain) | Entity and value-object rules without frameworks or databases |
 | [`tests/unit/application/`](../tests/unit/application) | Use-case behavior with in-memory repository and unit-of-work fakes |
 | [`tests/specs/`](../tests/specs) | Collaboration specifications using autospecced repository and unit-of-work mocks |
+| [`tests/unit/di/`](../tests/unit/di) | Container isolation and per-unit-of-work session ownership without a live database |
 | [`tests/unit/infrastructure/`](../tests/unit/infrastructure) | Mapper behavior and ORM metadata checks without a live database |
 | [`tests/integration/persistence/`](../tests/integration/persistence) | MySQL repository, rollback, uniqueness, and durable-commit tests; explicitly enabled |
 | [`tests/integration/api/test_health.py`](../tests/integration/api/test_health.py) | HTTP health behavior using FastAPI `TestClient`, without a database |
+| [`tests/integration/api/test_books_api.py`](../tests/integration/api/test_books_api.py) | Create-book route, configured service with fake units of work, validation, and engine cleanup without a database |
 | [`tests/fakes/`](../tests/fakes) | Reusable in-memory adapters |
+
+HTTP tests replace dependencies through `create_app(provider_overrides=[provider])`. Register
+replacement factories on a Dishka `Provider` with `override=True`, using the production dependency
+type as `provides`. For example:
+
+```python
+from dishka import Provider, Scope
+
+provider = Provider(scope=Scope.APP)
+provider.provide(lambda: service, provides=CreateBookService, override=True)
+app = create_app(provider_overrides=[provider])
+```
+
+This replaces the service only for that application. To exercise real service orchestration,
+override `UnitOfWorkFactory` with a factory returning fake units of work instead. Use
+`TestClient` as a context manager so application shutdown closes the container and its resources.
+Application and domain tests still use direct constructor injection without a container.
+
+For a Python `type` alias such as `UnitOfWorkFactory`, register the override using a function with
+that return annotation, rather than `provides=UnitOfWorkFactory`:
+
+```python
+def provide_unit_of_work_factory() -> UnitOfWorkFactory:
+    return fake_unit_of_work_factory
+
+
+provider.provide(provide_unit_of_work_factory, override=True)
+```
+
+Dishka 1.10.1 expands the annotated return alias into registrations for both the alias and its
+underlying type. Constructor parameters resolve through the underlying type. Explicit
+`provides=UnitOfWorkFactory` alone does not perform that expansion and can leave the production
+factory active. The configured-service API test verifies that this override reaches the use case.
 
 Prefer fakes for observable application outcomes. Use interaction assertions where the interaction is a contract, such as committing only on success. Do not assert every internal call or mirror implementation steps without a behavioral reason.
 

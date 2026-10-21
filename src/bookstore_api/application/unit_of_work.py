@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from types import TracebackType
 from typing import Protocol, Self
 
@@ -19,3 +20,6 @@ class UnitOfWork(Protocol):
     ) -> None: ...
 
     def commit(self) -> None: ...
+
+
+type UnitOfWorkFactory = Callable[[], UnitOfWork]

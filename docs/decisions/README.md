@@ -11,6 +11,7 @@ Routine implementation details do not need a decision record. Existing code alon
 ## Records
 
 - [0001: Learning strategy and catalog scope](0001-learning-strategy.md) — Accepted.
+- [0002: Dishka dependency injection](0002-dishka-dependency-injection.md) — Accepted.
 
 ## Naming and lifecycle
 

@@ -7,6 +7,7 @@ services:
 
     ports:
       - "127.0.0.1:8000:8000"
+      - "127.0.0.1:5678:5678"
 
     environment:
       APP_ENVIRONMENT: development
@@ -29,13 +30,20 @@ services:
       - uv
       - run
       - --no-dev
+      - --with
+      - debugpy
+      - python
+      - -m
+      - debugpy
+      - --listen
+      - 0.0.0.0:5678
+      - -m
       - uvicorn
       - bookstore_api.main:app
       - --host
       - 0.0.0.0
       - --port
       - "8000"
-      - --reload
 
   mysql:
     image: mysql:8.4

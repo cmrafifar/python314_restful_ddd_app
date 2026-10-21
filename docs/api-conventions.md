@@ -8,7 +8,15 @@ Read when adding or changing HTTP behavior. Current behavior and proposed conven
 
 FastAPI exposes generated documentation at `/docs` and `/redoc`, and its schema at `/openapi.json`. Treat the running application's generated schema as the source for implemented HTTP operations.
 
-There are no book endpoints, custom application error handlers, pagination contracts, authentication rules, or API versioning conventions yet. The internal create-book command/result is not an established wire format.
+`POST /api/v1/books` accepts a JSON object with required string fields `isbn`, `title`, and
+`author`. Extra fields are rejected. Success returns HTTP 201 and `{"id": "<uuid>"}`.
+Duplicate ISBNs reported as `BookAlreadyExistsError` return HTTP 409 with
+`{"detail": "<message>"}`. Request shape errors use FastAPI's standard HTTP 422 validation
+response. No `Location` header is emitted because no book retrieval route exists.
+
+Current limitation: domain `ValueError` failures, such as an invalid ISBN checksum, are not
+translated into client errors yet and result in HTTP 500. There are no custom application
+error handlers, pagination contracts, authentication rules, or general API versioning policy.
 
 ## Required adapter boundaries
 
@@ -20,9 +28,10 @@ There are no book endpoints, custom application error handlers, pagination contr
 - Never expose database exception text, SQL, credentials, or tracebacks as a designed error payload.
 - Verify HTTP behavior with route-level tests and update generated schema descriptions alongside endpoints.
 
-## Proposed defaults for the first book endpoints
+## Proposed defaults for future endpoint work
 
-These are design starting points, not implemented contracts. Confirm them in the endpoint change and replace this section with the chosen contract.
+These remain design starting points where the current contract above does not specify behavior.
+Confirm them in the relevant endpoint change.
 
 | Concern | Proposed convention |
 |---|---|

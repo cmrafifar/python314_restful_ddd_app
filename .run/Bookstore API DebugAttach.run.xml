@@ -1,0 +1,10 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Bookstore API DebugAttach" type="PythonDapAttachConfiguration">
+    <pathMappings>
+      <mapping local="$PROJECT_DIR$/src" remote="/app/src" />
+    </pathMappings>
+    <option name="remoteAddress" value="127.0.0.1:5678" />
+    <option name="remoteRoot" />
+    <method v="2" />
+  </configuration>
+</component>

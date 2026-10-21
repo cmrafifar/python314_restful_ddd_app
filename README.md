@@ -17,11 +17,13 @@ The next planned learning slice is to create a book through HTTP, persist it in 
 ## Current scope
 
 - A `Book` entity and immutable `ISBN` value object.
-- An internal create-book use case with duplicate-ISBN detection.
+- A create-book use case with duplicate-ISBN detection, exposed through `POST /api/v1/books`.
 - Repository and unit-of-work ports, SQLAlchemy persistence adapters, and a books-table migration.
 - A `GET /health` endpoint returning `{"status": "ok"}`.
 
-Book use cases are not yet exposed through HTTP. Inventory, ordering, pricing, and authentication are outside the current implementation.
+Book retrieval is not implemented yet. See [API conventions](docs/api-conventions.md) for the
+create endpoint's contract and validation limits. Inventory, ordering, pricing, and
+authentication are outside the current implementation.
 
 ## Quick start
 

@@ -13,6 +13,28 @@ Read when writing or reviewing Python. These are required conventions for new an
 
 [pyproject.toml](../pyproject.toml) and [.editorconfig](../.editorconfig) are authoritative tool configuration. Do not duplicate tool configuration in new files.
 
+## Type annotations
+
+Use descriptive type aliases for complex annotations when the name makes a contract easier to
+understand. Use Python's `type` statement and `PascalCase` names. Define each alias beside the
+contract that owns its meaning, rather than in a generic module collecting unrelated types.
+
+For example, `application/unit_of_work.py` defines:
+
+```python
+type UnitOfWorkFactory = Callable[[], UnitOfWork]
+```
+
+Use `UnitOfWorkFactory` consistently in service constructors, provider return annotations,
+dependency registrations, and container lookups. The alias describes a callable that takes no
+arguments and returns a unit of work. It does not construct the callable or change transaction
+ownership. A lambda or `partial` can implement that contract; neither replaces its type annotation.
+
+This is a deliberate readability convention for future code. Keep simple annotations such as
+`str`, `Settings`, and `list[Book]` direct unless an alias adds useful meaning. Do not hide framework
+injection metadata such as `Depends` inside application type aliases. When a library inspects
+annotations at runtime, verify that its registration and resolution support the alias.
+
 ## Design and responsibility
 
 - Give each module and class one coherent responsibility. Separate business validation, orchestration, transport, and persistence.
@@ -32,7 +54,7 @@ Preserve the roles of routes, application services, domain entities, and persist
 - Use `Protocol` for structural port contracts; adapters need not inherit a port solely to satisfy its type contract.
 - Prefer ordinary functions for stateless behavior when a class would only wrap one function without adding a useful responsibility.
 - Use dataclasses for suitable core data records and Pydantic models for boundary validation. Keep framework models outside the core.
-- Use explicit constructor or factory wiring. Keep FastAPI dependency injection at the HTTP/composition boundary rather than introducing service location into use cases.
+- Use ordinary constructor dependencies in application and domain code. Register services through Dishka providers in `di/`; keep `FromDishka` annotations at HTTP boundaries. Do not resolve containers inside use cases. See [dependency injection](architecture.md#dependency-injection) for registration and lifetime rules.
 - Keep SQLAlchemy models separate from domain entities. Do not assume Eloquent-style active-record behavior or automatic persistence of domain-object mutations.
 - Use context managers for resource ownership and pytest fixtures for test setup. Explain their lifecycle implications when introducing them.
 - Choose synchronous or asynchronous execution based on the complete I/O path and learning objective. Do not add `async` merely because FastAPI supports it.

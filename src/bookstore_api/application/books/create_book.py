@@ -1,9 +1,8 @@
-from collections.abc import Callable
 from dataclasses import dataclass
 from uuid import UUID
 
 from bookstore_api.application.books.commands import CreateBookCommand
-from bookstore_api.application.unit_of_work import UnitOfWork
+from bookstore_api.application.unit_of_work import UnitOfWorkFactory
 from bookstore_api.domain.books.book import Book
 from bookstore_api.domain.books.isbn import ISBN
 
@@ -20,7 +19,7 @@ class CreateBookResult:
 class CreateBookService:
     def __init__(
         self,
-        uow_factory: Callable[[], UnitOfWork],
+        uow_factory: UnitOfWorkFactory,
     ) -> None:
         self._uow_factory = uow_factory
 
