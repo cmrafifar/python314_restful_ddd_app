@@ -8,7 +8,13 @@ from bookstore_api.application.books.create_book import (
     CreateBookResult,
     CreateBookService,
 )
+from bookstore_api.application.books.get_book_details import (
+    BookNotFoundError,
+    GetBookDetailsService,
+)
 from bookstore_api.application.unit_of_work import UnitOfWork, UnitOfWorkFactory
+from bookstore_api.domain.books.book import Book
+from bookstore_api.domain.books.isbn import ISBN
 from bookstore_api.main import create_app
 from tests.fakes.book_repository import FakeBookRepository
 from tests.fakes.unit_of_work import FakeUnitOfWork
@@ -103,6 +109,88 @@ def test_create_book_rejects_missing_fields() -> None:
         ("body", "title"),
         ("body", "author"),
     }
+
+
+def test_get_book_returns_200_using_configured_service() -> None:
+    repository = FakeBookRepository()
+    book = Book.create(
+        isbn=ISBN("9780132350884"),
+        title="Clean Code",
+        author="Robert C. Martin",
+    )
+    repository.add(book)
+    uow = FakeUnitOfWork(repository)
+
+    def provide_unit_of_work_factory() -> UnitOfWorkFactory:
+        return lambda: uow
+
+    overrides = Provider(scope=Scope.APP)
+    overrides.provide(provide_unit_of_work_factory, override=True)
+
+    with TestClient(create_app(provider_overrides=[overrides])) as client:
+        response = client.get(f"/api/v1/books/{book.id}")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "id": str(book.id),
+        "isbn": book.isbn.value,
+        "title": book.title,
+        "author": book.author,
+    }
+    assert uow.committed is False
+
+
+def test_get_book_rejects_invalid_uuid() -> None:
+    service = create_autospec(GetBookDetailsService, instance=True)
+    overrides = Provider(scope=Scope.REQUEST)
+    overrides.provide(lambda: service, provides=GetBookDetailsService, override=True)
+
+    with TestClient(create_app(provider_overrides=[overrides])) as client:
+        response = client.get("/api/v1/books/not-a-uuid")
+
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["path", "book_id"]
+    service.execute.assert_not_called()
+
+
+def test_get_book_returns_404_with_stable_error_code() -> None:
+    service = create_autospec(GetBookDetailsService, instance=True)
+    service.execute.side_effect = BookNotFoundError("Missing book")
+    book_id = uuid4()
+
+    overrides = Provider(scope=Scope.REQUEST)
+    overrides.provide(lambda: service, provides=GetBookDetailsService, override=True)
+
+    with TestClient(create_app(provider_overrides=[overrides])) as client:
+        response = client.get(f"/api/v1/books/{book_id}")
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "detail": {
+            "code": "book_not_found",
+            "message": "Book not found",
+        },
+    }
+    service.execute.assert_called_once_with(book_id)
+
+
+def test_get_book_documents_404_response() -> None:
+    schema = create_app().openapi()
+    responses = schema["paths"]["/api/v1/books/{book_id}"]["get"]["responses"]
+
+    assert {"200", "404", "422"} <= responses.keys()
+    assert responses["404"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/BookNotFoundResponse",
+    }
+
+    models = schema["components"]["schemas"]
+    assert models["BookNotFoundResponse"]["properties"]["detail"] == {
+        "$ref": "#/components/schemas/BookNotFoundDetail",
+    }
+    detail = models["BookNotFoundDetail"]
+    assert set(detail["required"]) == {"code", "message"}
+    assert detail["properties"]["code"]["const"] == "book_not_found"
+    assert detail["properties"]["message"]["type"] == "string"
 
 
 def test_app_disposes_database_engine_on_shutdown() -> None:

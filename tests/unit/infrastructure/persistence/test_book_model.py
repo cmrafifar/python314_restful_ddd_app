@@ -13,6 +13,7 @@ def test_book_model_maps_to_books_table() -> None:
         "isbn",
         "title",
         "author",
+        "version",
     }
 
 

@@ -13,6 +13,7 @@ class BookMapper:
             isbn=book.isbn.value,
             title=book.title,
             author=book.author,
+            version=book.version,
         )
 
     @staticmethod
@@ -22,4 +23,5 @@ class BookMapper:
             isbn=ISBN(model.isbn),
             title=model.title,
             author=model.author,
+            version=model.version,
         )

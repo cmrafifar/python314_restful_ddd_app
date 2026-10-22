@@ -1,4 +1,4 @@
-from sqlalchemy import String, UniqueConstraint
+from sqlalchemy import Integer, String, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from bookstore_api.infrastructure.persistence.base import Base
@@ -28,3 +28,17 @@ class BookModel(Base):
         String(255),
         nullable=False,
     )
+
+    version: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=1,
+        server_default=text("1"),
+    )
+
+    # The repository increments on every accepted write, including unchanged details.
+    # SQLAlchemy includes the previous version in UPDATE's WHERE clause.
+    __mapper_args__ = {  # noqa: RUF012 - SQLAlchemy declares this mapping as an instance attribute.
+        "version_id_col": version,
+        "version_id_generator": False,
+    }

@@ -1,0 +1,314 @@
+{
+  "schema_version": 1,
+  "project": "Python 3.14 Bookstore API",
+  "updated_on": "2026-10-22",
+  "purpose": "Track implemented learning artifacts and remaining curriculum without treating proposed work as authorization.",
+  "status_definitions": {
+    "complete": "The described artifact exists or the discussion was completed. This does not assert a fresh test run or live infrastructure verification.",
+    "todo": "Work remains before acceptance. Code may already exist; consult implementation_state and remaining_work."
+  },
+  "scope_definitions": {
+    "accepted": "Established project work or explicitly authorized current work.",
+    "proposed": "Curriculum goal requiring scope agreement before implementation."
+  },
+  "maintenance_rules": [
+    "Keep task IDs stable; reference IDs in discussions, commits, and pull requests.",
+    "Read linked source and tests before acting; this task list does not override code or project instructions.",
+    "Work on one lesson component at a time. Obtain explicit authorization before advancing to another component.",
+    "Before marking a task complete, satisfy its acceptance criteria and record relevant evidence and verification limits.",
+    "Track test execution separately from implementation. Never infer a passing test run from the presence of tests.",
+    "Keep HTTP contracts in route metadata and schemas. Use this file for progress, not a duplicate endpoint specification.",
+    "Do not implement hypothetical payment, order, reservation, or domain-event examples as existing requirements.",
+    "Do not read or index learnings/, docs/ai/, or QA.md to maintain this list."
+  ],
+  "current_focus": {
+    "lesson": 4,
+    "component": 3,
+    "title": "PUT/PATCH, validation, and conditional updates",
+    "task_ids": ["BOOK-011", "BOOK-012", "BOOK-013", "BOOK-014", "BOOK-015"],
+    "next_action": "Component 3 is complete. Obtain explicit authorization before starting Component 4 (BOOK-016: deletion and resource lifecycle).",
+    "verification": {
+      "fresh_checks_run_for_this_inventory": true,
+      "basis": "2026-10-22: fresh uv run pytest passed 95 tests with 9 MySQL cases skipped. uv run ruff check . and uv run ruff format --check . passed; uv run basedpyright reported 0 errors and warnings. Whitespace checks passed. Index left unchanged.",
+      "mysql": "2026-10-22: ./scripts/test_integration.py passed alembic upgrade head, alembic check (no schema drift), and all 50 integration tests, including 9 live MySQL persistence cases. Competing connections proved stale writes cannot overwrite accepted changes, unchanged writes advance the version, and uncommitted updates roll back details and version.",
+      "deployment": "The isolated test database was already at head, so the runner did not reapply the revision. A standalone verification harness executed the actual 8c214e7a93b0 upgrade/downgrade functions against a connection-local temporary books table in test MySQL: oversized existing titles and authors were rejected before DDL with data preserved; valid boundary-length rows survived upgrade with version 1; omitted versions received server default 1; downgrade removed only the version column and preserved rows. Permanent tables were not downgraded. This verifies revision operations and preflight, not a fresh full Alembic deployment or production rollout."
+    }
+  },
+  "tasks": [
+    {
+      "id": "BOOK-001",
+      "area": "foundation",
+      "title": "Establish Python tooling and development workflow",
+      "description": "Use uv, pytest, Ruff, BasedPyright, environment-backed settings, and Podman with documented startup and quality commands.",
+      "status": "complete",
+      "scope": "accepted",
+      "acceptance_criteria": ["Dependency and tool configuration exists.", "Development and test commands are documented."],
+      "evidence": ["pyproject.toml", "uv.lock", "compose.yaml", "README.md", "docs/development.md"]
+    },
+    {
+      "id": "BOOK-002",
+      "area": "domain",
+      "title": "Model Book identity and ISBN invariants",
+      "description": "Represent a book edition using a domain entity, UUID identity, and an ISBN value object with checksum validation, independent of HTTP and ORM types.",
+      "status": "complete",
+      "scope": "accepted",
+      "acceptance_criteria": ["Domain types and behavior tests exist.", "Domain code remains independent of adapters."],
+      "evidence": ["src/bookstore_api/domain/books/book.py", "src/bookstore_api/domain/books/isbn.py", "tests/unit/domain/books/test_book.py", "tests/unit/domain/books/test_isbn.py"]
+    },
+    {
+      "id": "BOOK-003",
+      "area": "application",
+      "title": "Create books through an application use case",
+      "description": "Coordinate book creation through a repository port and explicit Unit of Work, rejecting duplicate ISBNs and committing successful creation.",
+      "status": "complete",
+      "scope": "accepted",
+      "acceptance_criteria": ["Creation and duplicate behavior have isolated tests.", "Application code owns the commit decision."],
+      "evidence": ["src/bookstore_api/application/books/create_book.py", "src/bookstore_api/application/books/ports.py", "src/bookstore_api/application/unit_of_work.py", "tests/specs/application/books/test_create_book_spec.py"]
+    },
+    {
+      "id": "BOOK-004",
+      "area": "persistence",
+      "title": "Persist books with separate SQLAlchemy models",
+      "description": "Map domain objects to ORM models, preserve identity on reconstruction, and create the books schema through Alembic with database ISBN uniqueness.",
+      "status": "complete",
+      "scope": "accepted",
+      "acceptance_criteria": ["Concrete repository, mapper, and initial migration exist.", "Adapter tests cover mapping and persistence behavior."],
+      "evidence": ["src/bookstore_api/infrastructure/persistence/repositories/sqlalchemy_book_repository.py", "src/bookstore_api/infrastructure/persistence/mappers/book_mapper.py", "migrations/versions/46da991b1999_create_books_table.py", "tests/integration/persistence/test_sqlalchemy_unit_of_work.py"]
+    },
+    {
+      "id": "BOOK-005",
+      "area": "persistence",
+      "title": "Manage transaction and session lifetimes explicitly",
+      "description": "Create a session and repositories per Unit of Work, commit explicitly, roll back unfinished transactions, and close sessions on exit.",
+      "status": "complete",
+      "scope": "accepted",
+      "acceptance_criteria": ["Unit of Work owns session cleanup.", "Tests describe commit visibility and rollback behavior."],
+      "evidence": ["src/bookstore_api/infrastructure/persistence/sqlalchemy_unit_of_work.py", "tests/integration/persistence/test_sqlalchemy_unit_of_work.py"]
+    },
+    {
+      "id": "BOOK-006",
+      "area": "composition",
+      "title": "Wire application dependencies through Dishka",
+      "description": "Register providers explicitly, inject application services into FastAPI handlers, and dispose application resources through container shutdown.",
+      "status": "complete",
+      "scope": "accepted",
+      "acceptance_criteria": ["Composition stays outside domain and application code.", "Container isolation and HTTP wiring tests exist."],
+      "evidence": ["src/bookstore_api/di/container.py", "src/bookstore_api/di/providers/books.py", "src/bookstore_api/di/providers/persistence.py", "tests/unit/di/test_container.py", "tests/integration/api/test_books_api.py"]
+    },
+    {
+      "id": "BOOK-007",
+      "area": "http",
+      "title": "Expose book creation and process health",
+      "description": "Demonstrate typed request/response boundaries, a 201 creation response, duplicate-ISBN translation, standard request validation, and a lightweight health endpoint.",
+      "status": "complete",
+      "scope": "accepted",
+      "acceptance_criteria": ["POST and health handlers have HTTP tests.", "Creation response exposes the generated identity."],
+      "evidence": ["src/bookstore_api/api/books/router.py", "src/bookstore_api/api/books/schemas.py", "src/bookstore_api/main.py", "tests/integration/api/test_books_api.py", "tests/integration/api/test_health.py"]
+    },
+    {
+      "id": "BOOK-008",
+      "area": "lesson-4-component-1",
+      "title": "Understand REST resources and HTTP semantics",
+      "description": "Discuss resources versus entities, method safety and idempotency, HTTP DTO boundaries, status codes, and adapter-level exception translation.",
+      "status": "complete",
+      "scope": "accepted",
+      "acceptance_criteria": ["Knowledge check on PUT idempotency completed.", "Existing create/read artifacts demonstrate the discussed HTTP boundaries."],
+      "evidence": ["docs/api-conventions.md", "src/bookstore_api/api/books/router.py"],
+      "verification_note": "Discussion completion comes from the supplied lesson handoff; it is not inferred solely from code."
+    },
+    {
+      "id": "BOOK-009",
+      "area": "lesson-4-component-2",
+      "title": "Retrieve a book by ID",
+      "description": "Reuse repository lookup through an application service and return a separate read DTO, structured missing-book response, and standard invalid-UUID validation.",
+      "status": "complete",
+      "scope": "accepted",
+      "acceptance_criteria": ["GET returns book details or 404.", "Invalid UUIDs return 422.", "POST retains its existing response contract."],
+      "evidence": ["src/bookstore_api/application/books/get_book_details.py", "src/bookstore_api/api/books/router.py", "tests/unit/application/books/test_get_book_details.py", "tests/integration/api/test_books_api.py"]
+    },
+    {
+      "id": "BOOK-010",
+      "area": "http-documentation",
+      "title": "Document HTTP contracts through generated OpenAPI",
+      "description": "Document the read endpoint's 404 response and define reusable response metadata, including a future 429 contract with Retry-After, while keeping README focused on project usage.",
+      "status": "complete",
+      "scope": "accepted",
+      "acceptance_criteria": ["Read 404 appears in OpenAPI.", "Reusable rate-limit metadata exists without implying rate limiting is active.", "README links generated API documentation."],
+      "evidence": ["src/bookstore_api/api/responses.py", "src/bookstore_api/api/books/router.py", "tests/integration/api/test_books_api.py", "README.md"]
+    },
+    {
+      "id": "BOOK-011",
+      "area": "lesson-4-component-3",
+      "title": "Replace and partially update writable book details",
+      "description": "Implement PUT requiring title and author, and PATCH preserving omitted fields. Keep ID and ISBN read-only and reject unsupported fields, null values, and empty patches.",
+      "status": "complete",
+      "scope": "accepted",
+      "implementation_state": "Application and HTTP update tests pass locally; final diff reviewed. HTTP tests use fake persistence.",
+      "acceptance_criteria": ["PUT/PATCH behavior tests pass.", "Missing books return 404.", "No transaction commits on invalid input or conflict."],
+      "remaining_work": [],
+      "evidence": ["src/bookstore_api/application/books/update_book.py", "src/bookstore_api/api/books/router.py", "tests/unit/application/books/test_update_book.py", "tests/integration/api/test_book_updates.py"]
+    },
+    {
+      "id": "BOOK-012",
+      "area": "lesson-4-component-3",
+      "title": "Experiment with transport and domain validation",
+      "description": "Enforce trimmed nonempty titles up to 100 characters and authors up to 80 characters at both HTTP and domain boundaries, with accurate request schemas.",
+      "status": "complete",
+      "scope": "accepted",
+      "implementation_state": "Domain boundary and HTTP/OpenAPI tests pass. docs/domain/books.md explains transport and domain validation ownership.",
+      "acceptance_criteria": ["Exact limits succeed and excessive lengths fail.", "Invalid HTTP input returns 422.", "Invalid domain updates do not partially mutate details.", "OpenAPI describes required, optional, and nonnullable fields correctly."],
+      "remaining_work": [],
+      "evidence": ["src/bookstore_api/domain/books/book.py", "src/bookstore_api/api/books/schemas.py", "tests/unit/domain/books/test_book.py", "tests/integration/api/test_book_updates.py"]
+    },
+    {
+      "id": "BOOK-013",
+      "area": "lesson-4-component-3",
+      "title": "Protect updates with ETag and If-Match",
+      "description": "Expose book validators and translate HTTP preconditions into application version expectations, with an atomic database version check protecting concurrent writes.",
+      "status": "complete",
+      "scope": "accepted",
+      "implementation_state": "Header/conflict HTTP tests pass using fakes. SQL predicate and transaction behavior documented. Live MySQL concurrency, unchanged-write version increment, and rollback regressions passed on 2026-10-22 through ./scripts/test_integration.py.",
+      "acceptance_criteria": ["Missing If-Match returns 428; malformed input returns 400; stale or nonmatching validators return 412.", "GET and successful PATCH expose ETag.", "Concurrent stale writes cannot overwrite accepted changes.", "Document strong matching, tag lists, wildcard semantics, and PUT validator behavior."],
+      "remaining_work": [],
+      "evidence": ["src/bookstore_api/api/books/conditional_requests.py", "src/bookstore_api/application/books/update_book.py", "src/bookstore_api/infrastructure/persistence/repositories/sqlalchemy_book_repository.py", "tests/integration/api/test_book_updates.py", "tests/integration/persistence/test_sqlalchemy_book_updates.py", "docs/architecture.md", "docs/api-conventions.md"]
+    },
+    {
+      "id": "BOOK-014",
+      "area": "lesson-4-component-3",
+      "title": "Review and verify the version-counter migration",
+      "description": "Add an integer version counter initialized to 1 without truncating existing text. Audit existing title/author lengths and document deployment and rollback consequences.",
+      "status": "complete",
+      "scope": "accepted",
+      "implementation_state": "Upgrade/downgrade and preflight reviewed; migration guide documents defaults, execution, rollout, rollback, and ETag invalidation. On 2026-10-22 the integration runner confirmed the test database is at head without schema drift. The actual revision functions passed live MySQL checks on a temporary table for incompatible-data rejection, existing-row preservation, version initialization, server default, and downgrade. This does not claim a fresh full Alembic deployment or production rollout; see current_focus.verification.",
+      "acceptance_criteria": ["Review upgrade/downgrade and existing-data preflight behavior.", "Document why text(\"1\") is a SQL expression for an integer default.", "Document migration execution and rollback requirements.", "Record user-owned MySQL verification separately from local checks."],
+      "remaining_work": [],
+      "evidence": ["migrations/versions/8c214e7a93b0_add_book_version.py", "src/bookstore_api/infrastructure/persistence/models/book.py", "migrations/README.md"]
+    },
+    {
+      "id": "BOOK-015",
+      "area": "lesson-4-component-3",
+      "title": "Finish update documentation and quality review",
+      "description": "Keep rich OpenAPI response metadata beside the handlers, explain conditional updates in project documentation, and reconcile stale architecture statements with implemented behavior.",
+      "status": "complete",
+      "scope": "accepted",
+      "implementation_state": "Domain, architecture, API, testing, and migration documentation reviewed against implementation. Fresh local pytest, Ruff, formatting, BasedPyright, and whitespace checks pass. Live MySQL results for BOOK-013 and BOOK-014 verified on 2026-10-22 with limits recorded under current_focus.verification. Conventional Commit suggestion previously supplied; no staging or committing performed.",
+      "acceptance_criteria": ["OpenAPI documents update inputs, headers, success, validation, missing-resource, and precondition responses.", "Domain, architecture, API, and migration documentation agree with the reviewed implementation.", "Relevant pytest, Ruff, and BasedPyright checks pass.", "Report verification limits and provide a Conventional Commit suggestion without committing automatically."],
+      "remaining_work": [],
+      "evidence": ["src/bookstore_api/api/responses.py", "src/bookstore_api/api/books/responses.py", "docs/architecture.md", "docs/domain/books.md", "docs/api-conventions.md", "docs/testing.md"],
+      "depends_on": ["BOOK-011", "BOOK-012", "BOOK-013", "BOOK-014"]
+    },
+    {
+      "id": "BOOK-016",
+      "area": "lesson-4-component-4",
+      "title": "Delete books and define resource lifecycle",
+      "description": "Agree on deletion semantics, repeated deletion, missing resources, and concurrency preconditions before adding the domain/application/HTTP behavior needed.",
+      "status": "todo",
+      "scope": "proposed",
+      "acceptance_criteria": ["Agree on lifecycle and HTTP contract.", "Implement and test the agreed slice."],
+      "depends_on": ["BOOK-015"]
+    },
+    {
+      "id": "BOOK-017",
+      "area": "lesson-4-component-5",
+      "title": "List books with agreed filters",
+      "description": "Define a collection representation, supported filters, stable ordering, and bounded queries using existing architectural boundaries.",
+      "status": "todo",
+      "scope": "proposed",
+      "acceptance_criteria": ["Agree on filters and ordering.", "Test empty collections, matching results, and invalid query parameters."]
+    },
+    {
+      "id": "BOOK-018",
+      "area": "lesson-4-component-6",
+      "title": "Add keyset pagination",
+      "description": "Choose a deterministic ordering and cursor contract, then explore pagination behavior under concurrent inserts and updates.",
+      "status": "todo",
+      "scope": "proposed",
+      "acceptance_criteria": ["Document cursor semantics and limits.", "Test ordering ties, page boundaries, and invalid cursors."],
+      "depends_on": ["BOOK-017"]
+    },
+    {
+      "id": "BOOK-019",
+      "area": "lesson-4-component-7",
+      "title": "Make expected errors and validation consistent",
+      "description": "Agree on an error contract and translate expected application/domain failures, including invalid ISBN checksums, without misclassifying unexpected defects as client mistakes.",
+      "status": "todo",
+      "scope": "proposed",
+      "acceptance_criteria": ["Document compatibility with existing error payloads and FastAPI 422 responses.", "Test expected failures and generic handling of unexpected server errors.", "Align implemented responses and OpenAPI metadata."]
+    },
+    {
+      "id": "BOOK-020",
+      "area": "lesson-4-component-8",
+      "title": "Review the complete HTTP vertical slices",
+      "description": "Review routing, validation, Dishka integration, serialization, errors, and persistence guarantees across completed catalog operations.",
+      "status": "todo",
+      "scope": "proposed",
+      "acceptance_criteria": ["Run appropriate unit, integration, and functional checks.", "Identify which checks use fakes and which prove real MySQL behavior.", "Record remaining limitations."],
+      "depends_on": ["BOOK-016", "BOOK-018", "BOOK-019"]
+    },
+    {
+      "id": "BOOK-021",
+      "area": "future-curriculum",
+      "title": "Authentication and authorization",
+      "description": "Choose an identity mechanism and concrete catalog access rules, then test permitted and denied operations at appropriate boundaries.",
+      "status": "todo",
+      "scope": "proposed",
+      "acceptance_criteria": ["Agree on identity and permission requirements before implementation.", "Implement a tested vertical slice without coupling the domain to HTTP authentication types."]
+    },
+    {
+      "id": "BOOK-022",
+      "area": "future-curriculum",
+      "title": "Rate limiting and reusable HTTP responses",
+      "description": "Choose limiter placement and scope, calculate retry delays, and connect real enforcement to the existing 429/Retry-After documentation.",
+      "status": "todo",
+      "scope": "proposed",
+      "acceptance_criteria": ["Agree on enforcement policy and ownership.", "Test limit enforcement and accurate Retry-After values.", "Attach response metadata only to affected operations."],
+      "depends_on": ["BOOK-010"]
+    },
+    {
+      "id": "BOOK-023",
+      "area": "future-curriculum",
+      "title": "Domain events and reliable background work",
+      "description": "Select a concrete catalog requirement that benefits from events or background processing, then examine transaction boundaries, delivery, retries, and crash recovery.",
+      "status": "todo",
+      "scope": "proposed",
+      "acceptance_criteria": ["Agree on a real use case before adding event infrastructure.", "Test the chosen delivery guarantees and failure recovery."]
+    },
+    {
+      "id": "BOOK-024",
+      "area": "future-curriculum",
+      "title": "Idempotency and recovery beyond version checks",
+      "description": "Choose an operation requiring request deduplication and investigate replay behavior, concurrent ownership, and recovery after process failure.",
+      "status": "todo",
+      "scope": "proposed",
+      "acceptance_criteria": ["Define guarantees and limitations for the chosen operation.", "Test concurrent requests, retries, and recovery without assuming exactly-once external effects."]
+    },
+    {
+      "id": "BOOK-025",
+      "area": "future-curriculum",
+      "title": "Observability and deployment",
+      "description": "Define operational needs for logs, metrics, tracing, readiness, configuration, and repeatable deployment, building on the existing Podman development workflow.",
+      "status": "todo",
+      "scope": "proposed",
+      "acceptance_criteria": ["Agree on deployment targets and operational requirements.", "Demonstrate the selected signals and deployment workflow without exposing secrets."]
+    },
+    {
+      "id": "BOOK-026",
+      "area": "future-curriculum",
+      "title": "Selected asynchronous Python patterns",
+      "description": "Explore async only through a concrete I/O requirement, including cancellation, resource lifetimes, and compatibility with synchronous persistence.",
+      "status": "todo",
+      "scope": "proposed",
+      "acceptance_criteria": ["Explain why the chosen work benefits from async.", "Test cancellation and cleanup for the selected pattern."]
+    },
+    {
+      "id": "BOOK-027",
+      "area": "future-curriculum",
+      "title": "Container orchestration and infrastructure as code",
+      "description": "Choose a deployment environment and introduce orchestration and infrastructure definitions only after concrete operational requirements are agreed.",
+      "status": "todo",
+      "scope": "proposed",
+      "acceptance_criteria": ["Agree on platform and infrastructure scope.", "Document provisioning, deployment, configuration, and teardown for the selected environment."],
+      "depends_on": ["BOOK-025"]
+    }
+  ]
+}

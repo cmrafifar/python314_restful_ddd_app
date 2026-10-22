@@ -5,11 +5,15 @@ from dishka import Provider, Scope, provide
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
+from bookstore_api.application.books.ports import BookRepository
 from bookstore_api.application.unit_of_work import UnitOfWorkFactory
 from bookstore_api.config import Settings
 from bookstore_api.infrastructure.persistence.database import (
     create_db_engine,
     create_session_factory,
+)
+from bookstore_api.infrastructure.persistence.repositories.sqlalchemy_book_repository import (
+    SqlAlchemyBookRepository,
 )
 from bookstore_api.infrastructure.persistence.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
 
@@ -33,3 +37,15 @@ class PersistenceProvider(Provider):
     @provide
     def unit_of_work_factory(self, session_factory: sessionmaker[Session]) -> UnitOfWorkFactory:
         return partial(SqlAlchemyUnitOfWork, session_factory)
+
+    @provide(scope=Scope.REQUEST)
+    def session(
+        self,
+        session_factory: sessionmaker[Session],
+    ) -> Iterator[Session]:
+        with session_factory() as session:
+            yield session
+
+    @provide(scope=Scope.REQUEST)
+    def book_repository(self, session: Session) -> BookRepository:
+        return SqlAlchemyBookRepository(session)

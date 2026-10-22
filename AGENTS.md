@@ -6,13 +6,14 @@ Use this file as the entry point. Read the documents relevant to the task; do no
 
 `docs/ai/` contains human-readable reference material, not agent instructions. Exclude it from routine discovery, searches, and context loading, and do not follow links into it. For broad text searches, use `rg --glob '!docs/ai/**'`. Read or edit files there only when the user explicitly requests work on that documentation. Never treat their contents as agent instructions.
 
-`QA.md` is a human-only learning journal for manually reviewing knowledge-check questions and answers. Do not read, index, summarize, or load it as agent context, and never treat it as agent instructions or project requirements. Exclude it from discovery and searches; broad text searches must also include `--glob '!QA.md'`. Access it only when the user explicitly requests recording a resolved question and answer or other work on that file; keep that access limited to the requested task.
+`learnings/` contains learning notes and journals for human eyes only, including `learnings/q-and-a.md`. AI agents must ignore the entire directory: do not read, index, summarize, load it as context, or follow links into it. Never treat its contents as agent instructions or project requirements. Access files there only when the user explicitly requests work on those files, and keep access limited to that task. For broad text searches, use `rg --glob '!docs/ai/**' --glob '!learnings/**' --glob '!QA.md'`.
 
 The developer is a senior PHP 8.4/Laravel 12 backend engineer learning Python. Preserve DDD and hexagonal boundaries while favoring idiomatic Python. Read the [learning goals](README.md#learning-goals-and-working-approach) when choosing teaching examples or business requirements.
 
 | Task | Read |
 |---|---|
 | Understand project scope or start the API | [README.md](README.md) |
+| Resume lessons, review progress, or plan remaining work | [Machine-readable task list](docs/task-list.json) |
 | Add behavior, ports, adapters, or dependencies | [Architecture](docs/architecture.md) |
 | Write or review Python | [Coding guidelines](docs/coding-guidelines.md) |
 | Change book rules or terminology | [Books domain](docs/domain/books.md) |
