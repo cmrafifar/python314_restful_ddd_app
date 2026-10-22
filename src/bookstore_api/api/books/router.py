@@ -1,25 +1,38 @@
+from typing import Annotated
 from uuid import UUID
 
 from dishka.integrations.fastapi import DishkaSyncRoute, FromDishka
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Header, HTTPException, Response, status
 
+from bookstore_api.api.books.conditional_requests import (
+    IF_MATCH_DESCRIPTION,
+    book_etag,
+    parse_if_match,
+)
+from bookstore_api.api.books.responses import BOOK_NOT_FOUND_RESPONSES, BOOK_READ_RESPONSES
 from bookstore_api.api.books.schemas import (
     BookDetailsResponse,
-    BookNotFoundResponse,
     BookResponse,
     CreateBookRequest,
+    PatchBookRequest,
+    ReplaceBookRequest,
 )
+from bookstore_api.api.responses import CONDITIONAL_UPDATE_RESPONSES
 from bookstore_api.application.books.commands import (
     CreateBookCommand,
+    UpdateBookCommand,
 )
 from bookstore_api.application.books.create_book import (
     BookAlreadyExistsError,
     CreateBookService,
 )
+from bookstore_api.application.books.errors import BookVersionConflictError
 from bookstore_api.application.books.get_book_details import (
     BookNotFoundError,
+    GetBookDetailsResult,
     GetBookDetailsService,
 )
+from bookstore_api.application.books.update_book import UpdateBookService
 
 router = APIRouter(prefix="/api/v1/books", tags=["books"], route_class=DishkaSyncRoute)
 
@@ -54,15 +67,11 @@ def create_book(
     "/{book_id}",
     response_model=BookDetailsResponse,
     status_code=status.HTTP_200_OK,
-    responses={
-        status.HTTP_404_NOT_FOUND: {
-            "model": BookNotFoundResponse,
-            "description": "No book exists with the requested ID.",
-        },
-    },
+    responses=BOOK_READ_RESPONSES,
 )
 def get_book(
     book_id: UUID,
+    response: Response,
     service: FromDishka[GetBookDetailsService],
 ) -> BookDetailsResponse:
     try:
@@ -75,9 +84,91 @@ def get_book(
                 "message": "Book not found",
             },
         ) from exc
+    response.headers["ETag"] = book_etag(book_id, book_details_result.version)
+    return _book_response(book_details_result)
+
+
+@router.put(
+    "/{book_id}",
+    response_model=BookDetailsResponse,
+    responses={**CONDITIONAL_UPDATE_RESPONSES, **BOOK_NOT_FOUND_RESPONSES},
+    summary="Replace a book's writable details",
+    description=(
+        "Requires title and author; ISBN and ID are read-only. Uses If-Match to prevent lost updates. "
+        "Trims outer whitespace. Returns the updated representation, but no ETag because PUT input "
+        "may be transformed; GET the book to obtain its next validator. Does not create missing books."
+    ),
+)
+def replace_book(
+    book_id: UUID,
+    request: ReplaceBookRequest,
+    service: FromDishka[UpdateBookService],
+    if_match: Annotated[list[str] | None, Header(description=IF_MATCH_DESCRIPTION)] = None,
+) -> BookDetailsResponse:
+    result = _update_book(book_id, request.title, request.author, if_match, service)
+    return _book_response(result)
+
+
+@router.patch(
+    "/{book_id}",
+    response_model=BookDetailsResponse,
+    responses={**CONDITIONAL_UPDATE_RESPONSES, **BOOK_READ_RESPONSES},
+    summary="Change selected book details",
+    description=(
+        "Send title, author, or both as application/json. Omitted fields remain unchanged. "
+        "An empty object, explicit null, unknown fields, and invalid text return 422. "
+        "This is a field-update contract, not JSON Patch or JSON Merge Patch. "
+        "Requires If-Match; returns a fresh ETag on success."
+    ),
+)
+def patch_book(
+    book_id: UUID,
+    request: PatchBookRequest,
+    response: Response,
+    service: FromDishka[UpdateBookService],
+    if_match: Annotated[list[str] | None, Header(description=IF_MATCH_DESCRIPTION)] = None,
+) -> BookDetailsResponse:
+    result = _update_book(book_id, request.title, request.author, if_match, service)
+    response.headers["ETag"] = book_etag(book_id, result.version)
+    return _book_response(result)
+
+
+def _update_book(
+    book_id: UUID,
+    title: str | None,
+    author: str | None,
+    if_match: list[str] | None,
+    service: UpdateBookService,
+) -> GetBookDetailsResult:
+    versions = parse_if_match(book_id, if_match)
+    try:
+        return service.execute(
+            UpdateBookCommand(
+                book_id=book_id,
+                expected_versions=versions,
+                title=title,
+                author=author,
+            )
+        )
+    except BookNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "book_not_found", "message": "Book not found"},
+        ) from exc
+    except BookVersionConflictError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_412_PRECONDITION_FAILED,
+            detail={
+                "code": "precondition_failed",
+                "message": "The book changed; retrieve it before updating",
+            },
+        ) from exc
+
+
+def _book_response(result: GetBookDetailsResult) -> BookDetailsResponse:
     return BookDetailsResponse(
-        id=book_details_result.book_id,
-        title=book_details_result.title,
-        author=book_details_result.author,
-        isbn=book_details_result.isbn.value,
+        id=result.book_id,
+        title=result.title,
+        author=result.author,
+        isbn=result.isbn.value,
     )

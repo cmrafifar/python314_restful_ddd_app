@@ -5,9 +5,9 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import delete
 from sqlalchemy.engine import Engine
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
+from bookstore_api.application.books.create_book import BookAlreadyExistsError
 from bookstore_api.domain.books.book import Book
 from bookstore_api.domain.books.isbn import ISBN
 from bookstore_api.infrastructure.persistence.models.book import BookModel
@@ -90,7 +90,7 @@ def test_mysql_rejects_duplicate_isbn(
         uow.books.add(first)
         uow.commit()
 
-    with pytest.raises(IntegrityError), SqlAlchemyUnitOfWork(session_factory) as uow:
+    with pytest.raises(BookAlreadyExistsError), SqlAlchemyUnitOfWork(session_factory) as uow:
         uow.books.add(second)
         uow.commit()
 

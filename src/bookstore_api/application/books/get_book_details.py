@@ -1,12 +1,11 @@
 from dataclasses import dataclass
 from uuid import UUID
 
+from bookstore_api.application.books.errors import BookNotFoundError
 from bookstore_api.application.unit_of_work import UnitOfWorkFactory
 from bookstore_api.domain.books.isbn import ISBN
 
-
-class BookNotFoundError(Exception):
-    pass
+__all__ = ["BookNotFoundError", "GetBookDetailsResult", "GetBookDetailsService"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -15,6 +14,7 @@ class GetBookDetailsResult:
     isbn: ISBN
     title: str
     author: str
+    version: int = 1
 
 
 class GetBookDetailsService:
@@ -31,4 +31,5 @@ class GetBookDetailsService:
                 isbn=book.isbn,
                 title=book.title,
                 author=book.author,
+                version=book.version,
             )

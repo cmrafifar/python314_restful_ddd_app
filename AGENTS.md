@@ -13,6 +13,7 @@ The developer is a senior PHP 8.4/Laravel 12 backend engineer learning Python. P
 | Task | Read |
 |---|---|
 | Understand project scope or start the API | [README.md](README.md) |
+| Resume lessons, review progress, or plan remaining work | [Machine-readable task list](docs/task-list.json) |
 | Add behavior, ports, adapters, or dependencies | [Architecture](docs/architecture.md) |
 | Write or review Python | [Coding guidelines](docs/coding-guidelines.md) |
 | Change book rules or terminology | [Books domain](docs/domain/books.md) |

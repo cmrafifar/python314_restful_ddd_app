@@ -73,6 +73,7 @@ uv run basedpyright
 Start with [AGENTS.md](AGENTS.md) for task-specific reading and validation commands.
 
 - [Architecture](docs/architecture.md): boundaries, dependencies, transactions, and use-case flow.
+- [Task list](docs/task-list.json): machine-readable progress, acceptance criteria, and proposed curriculum with stable task IDs.
 - [Coding guidelines](docs/coding-guidelines.md): Python style and practical design rules.
 - [Books domain](docs/domain/books.md): terminology, invariants, and unresolved questions.
 - [Testing](docs/testing.md): test boundaries, doubles, and database requirements.

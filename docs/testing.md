@@ -14,6 +14,8 @@ Read when adding tests or validating behavior. Use pytest files named `test_*.py
 | [`tests/integration/persistence/`](../tests/integration/persistence) | MySQL repository, rollback, uniqueness, and durable-commit tests; explicitly enabled |
 | [`tests/integration/api/test_health.py`](../tests/integration/api/test_health.py) | HTTP health behavior using FastAPI `TestClient`, without a database |
 | [`tests/integration/api/test_books_api.py`](../tests/integration/api/test_books_api.py) | Create-book route, configured service with fake units of work, validation, and engine cleanup without a database |
+| [`tests/integration/api/test_book_updates.py`](../tests/integration/api/test_book_updates.py) | PUT/PATCH, text limits, ETag/If-Match, and OpenAPI contracts with fake persistence |
+| [`tests/integration/persistence/test_sqlalchemy_book_updates.py`](../tests/integration/persistence/test_sqlalchemy_book_updates.py) | MySQL version predicate with competing independent connections, unchanged-write version increments, and rollback after update flush |
 | [`tests/fakes/`](../tests/fakes) | Reusable in-memory adapters |
 
 HTTP tests replace dependencies through `create_app(provider_overrides=[provider])`. Register
@@ -52,6 +54,22 @@ factory active. The configured-service API test verifies that this override reac
 Prefer fakes for observable application outcomes. Use interaction assertions where the interaction is a contract, such as committing only on success. Do not assert every internal call or mirror implementation steps without a behavioral reason.
 
 Fakes are not proof of database semantics. `FakeUnitOfWork` records whether commit was requested but does not implement transactional rollback. ORM metadata tests do not exercise live MySQL constraints.
+
+The MySQL update tests use independent connections for competing writers. Both writers read
+version 1; one commits version 2 before the stale writer flushes. The test keeps a stale ORM
+instance alive to exercise the SQL version predicate and verifies the winner's persisted data.
+A second case writes identical details to prove the version still advances. Rollback coverage
+checks that leaving without commit discards both flushed details and the incremented version.
+These tests belong to persistence integration; route tests with fakes cannot prove those guarantees.
+
+To run only update persistence coverage against an already migrated test database:
+
+```bash
+uv run pytest tests/integration/persistence/test_sqlalchemy_book_updates.py --run-integration
+```
+
+This requires `BOOKSTORE_TEST_DATABASE_URL` and the same test-target safeguards described below.
+Prefer `./scripts/test_integration.py` for the full provision/migrate/check/test workflow.
 
 ## Required regression evidence
 

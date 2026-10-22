@@ -2,7 +2,9 @@ from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.exc import StaleDataError
 
+from bookstore_api.application.books.errors import BookVersionConflictError
 from bookstore_api.application.books.ports import BookRepository
 from bookstore_api.domain.books.book import Book
 from bookstore_api.domain.books.isbn import ISBN
@@ -36,3 +38,18 @@ class SqlAlchemyBookRepository(BookRepository):
         model = BookMapper.to_model(book)
 
         self._session.add(model)
+
+    def update(self, book: Book) -> int:
+        model = self._session.get(BookModel, str(book.id))
+        if model is None or model.version != book.version:
+            raise BookVersionConflictError("The book changed or was deleted")
+
+        model.title = book.title
+        model.author = book.author
+        model.version += 1
+        try:
+            # Flush obtains the new version and checks concurrent writes, without committing.
+            self._session.flush()
+        except StaleDataError as exc:
+            raise BookVersionConflictError("The book changed or was deleted") from exc
+        return model.version

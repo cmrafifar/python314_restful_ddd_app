@@ -461,7 +461,68 @@ When we introduce AWS and Kubernetes deployment, we will enforce additional prac
 - Monitor migrations and large data backfills.
 - Prefer independently deployable, backward-compatible schema changes.
 
-## 16. Reference documentation
+## 16. Book version-counter migration
+
+Revision `8c214e7a93b0` follows `46da991b1999` and adds the nonnullable integer `version`
+column with a server default of 1. Existing rows receive version 1. Title and author columns
+remain `VARCHAR(255)`; the application now enforces title length 100 and author length 80.
+The migration does not truncate text or narrow those columns.
+
+Before applying the revision, inspect existing records using the target database's SQL client:
+
+```sql
+SELECT id, CHAR_LENGTH(title) AS title_length, CHAR_LENGTH(author) AS author_length
+FROM books
+WHERE CHAR_LENGTH(title) > 100 OR CHAR_LENGTH(author) > 80;
+```
+
+Review and correct incompatible records deliberately before retrying. The online upgrade runs
+the equivalent count check and raises before adding the column if it finds incompatible text.
+Offline SQL rendering skips that query because no connection exists; run this preflight
+separately before executing rendered SQL. Coordinate writes during preflight and deployment
+so older writers cannot introduce incompatible records after the check.
+
+`server_default=sa.text("1")` supplies a SQL expression, yielding `DEFAULT 1`. The Python
+string contains SQL source; it does not change the column from `Integer` to a text type.
+This follows SQLAlchemy's
+[server-default pattern](https://docs.sqlalchemy.org/en/20/core/defaults.html#server-invoked-ddl-explicit-default-expressions).
+The ORM's separate `default=1` handles inserts through SQLAlchemy; the server default also
+handles inserts that omit the column outside the ORM.
+
+With database settings configured, apply and inspect the revision from the repository root:
+
+```bash
+uv run alembic upgrade head
+uv run alembic current
+uv run alembic check
+```
+
+Apply the migration before starting application code that selects or writes `version`. Check
+the actual table and run the MySQL integration suite; file presence or offline SQL alone does
+not prove application, existing-data compatibility, or concurrent-write behavior. The isolated
+test workflow is `./scripts/test_integration.py`; see [testing](../docs/testing.md).
+
+To review only this revision's SQL without connecting to MySQL:
+
+```bash
+uv run alembic upgrade 46da991b1999:8c214e7a93b0 --sql
+uv run alembic downgrade 8c214e7a93b0:46da991b1999 --sql
+```
+
+Even offline rendering needs the environment-backed settings required by `migrations/env.py`.
+Use local configuration without printing credentials. Rendering omits the data preflight.
+
+Downgrading to `46da991b1999` drops `version` and loses all counters while preserving the
+other columns. Stop version-aware application workers before downgrading and deploy compatible
+code before resuming. Reapplying initializes counters to 1; invalidate previously issued ETags
+because old version-1 tags could match again. A downgrade does not relax the newer application's
+text rules. MySQL DDL can commit implicitly; do not assume transaction rollback restores a
+partially applied schema change. Review backups and recovery before executing a downgrade.
+
+Live MySQL migration and concurrency verification remains user-owned for the current lesson.
+Local static checks, HTTP tests with fakes, and SQL rendering must be reported separately.
+
+## 17. Reference documentation
 
 - [Alembic documentation](https://alembic.sqlalchemy.org/en/latest/)
 - [Alembic autogenerate](https://alembic.sqlalchemy.org/en/latest/autogenerate.html)

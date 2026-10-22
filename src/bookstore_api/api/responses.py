@@ -1,6 +1,74 @@
-"""Reusable OpenAPI metadata for endpoints that enforce rate limits."""
+"""Reusable OpenAPI response metadata; these declarations do not enforce behavior."""
 
 from fastapi import status
+from pydantic import BaseModel, ConfigDict
+
+
+class ErrorDetail(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    code: str
+    message: str
+
+
+class ErrorResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    detail: ErrorDetail
+
+
+ETAG_HEADERS: dict[str, object] = {
+    "ETag": {
+        "description": "Strong validator for this book representation. Send it unchanged in If-Match.",
+        "schema": {"type": "string"},
+        "example": '"book-5d23d9a6-4198-4fca-ae01-f962d7b71401-v1"',
+    },
+}
+
+CONDITIONAL_UPDATE_RESPONSES: dict[int | str, dict[str, object]] = {
+    status.HTTP_400_BAD_REQUEST: {
+        "model": ErrorResponse,
+        "description": "Malformed If-Match header. Use a quoted entity-tag, a list, or *.",
+        "content": {
+            "application/json": {
+                "example": {
+                    "detail": {
+                        "code": "invalid_if_match",
+                        "message": "Invalid If-Match header",
+                    }
+                }
+            }
+        },
+    },
+    status.HTTP_412_PRECONDITION_FAILED: {
+        "model": ErrorResponse,
+        "description": "No strong tag matched, or another writer changed/deleted the book before flush. Fetch and reconcile before retrying.",
+        "content": {
+            "application/json": {
+                "example": {
+                    "detail": {
+                        "code": "precondition_failed",
+                        "message": "The book changed; retrieve it before updating",
+                    }
+                }
+            }
+        },
+    },
+    status.HTTP_428_PRECONDITION_REQUIRED: {
+        "model": ErrorResponse,
+        "description": "If-Match is required. Retrieve the book and send its ETag.",
+        "content": {
+            "application/json": {
+                "example": {
+                    "detail": {
+                        "code": "precondition_required",
+                        "message": "Supply If-Match from the book's ETag",
+                    }
+                }
+            }
+        },
+    },
+}
 
 RATE_LIMIT_RESPONSES: dict[int | str, dict[str, object]] = {
     status.HTTP_429_TOO_MANY_REQUESTS: {

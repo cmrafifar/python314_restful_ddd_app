@@ -51,7 +51,7 @@ adding a wrapper solely to hide `yield`.
 | Location | Responsibility |
 |---|---|
 | [`domain/books/`](../src/bookstore_api/domain/books) | `Book`, `ISBN`, and local invariants |
-| [`application/books/`](../src/bookstore_api/application/books) | Create command, result, service, and repository port |
+| [`application/books/`](../src/bookstore_api/application/books) | Create, read, and update use cases, commands/results, and repository port |
 | [`application/unit_of_work.py`](../src/bookstore_api/application/unit_of_work.py) | Transaction boundary port |
 | [`infrastructure/persistence/`](../src/bookstore_api/infrastructure/persistence) | SQLAlchemy models, mapping, engine/session factories, repository, and unit of work |
 | [`api/books/`](../src/bookstore_api/api/books) | Book HTTP schemas and Dishka-enabled router |
@@ -96,11 +96,11 @@ Providers group related registrations, similar to Laravel service providers:
 
 - [`PersistenceProvider`](../src/bookstore_api/di/providers/persistence.py) owns engine creation
   and disposal, session-factory construction, and the `UnitOfWorkFactory` binding.
-- [`BooksProvider`](../src/bookstore_api/di/providers/books.py) registers `CreateBookService`
+- [`BooksProvider`](../src/bookstore_api/di/providers/books.py) registers `CreateBookService`, `GetBookDetailsService`, and `UpdateBookService`
   using constructor autowiring. Add book use cases here; add other cohesive providers when
   additional features require them. Register each provider explicitly in `create_container`.
 
-Settings, engine, session factory, unit-of-work factory, and the stateless create service use
+Settings, engine, session factory, unit-of-work factory, and stateless book services use
 `Scope.APP`. A fresh unit of work and session belong to each use-case execution, not the HTTP
 request scope. The unit of work still constructs its repositories so they share its session.
 Dishka does not control commits or construct domain entities from request data.
@@ -129,7 +129,43 @@ See [decision 0002](decisions/0002-dishka-dependency-injection.md) for alternati
 - Mapping reconstructs domain objects using the persisted UUID. It must not generate a replacement identity.
 - A database unique constraint protects ISBN uniqueness. The preliminary application lookup alone cannot prevent concurrent duplicates.
 
-Current limitations: database uniqueness failures are not translated to `BookAlreadyExistsError`. Loaded books are reconstructed objects; changing one does not automatically update its ORM model. There is no repository update operation or rename use case.
+The unit of work translates MySQL duplicate-key failures for `uq_books_isbn` into
+`BookAlreadyExistsError`; unrelated integrity errors propagate. Loaded books are reconstructed
+objects, so changing one does not automatically update its ORM model. The update use case
+explicitly calls the repository's `update` operation before committing.
+
+## Conditional update flow
+
+The HTTP adapter translates `If-Match` into an `UpdateBookCommand`: a set of acceptable versions,
+or `None` for the wildcard. The application loads the book, rejects missing or stale records,
+and invokes `revise_details`. The domain validates both proposed fields before mutating either.
+Omitted fields retain their values. ID and ISBN do not participate in this operation.
+
+The repository copies the revised details into the ORM model and increments its version,
+including when the supplied values are unchanged. `BookModel` configures SQLAlchemy's
+`version_id_col` and disables automatic generation because the repository increments explicitly.
+During `flush`, SQLAlchemy emits the equivalent of:
+
+```sql
+UPDATE books SET title = :title, author = :author, version = :next_version
+WHERE id = :id AND version = :previous_version;
+```
+
+Only a matching version can update the row. If no row matches, SQLAlchemy raises
+`StaleDataError`; the repository translates that into `BookVersionConflictError`. This closes
+the race between reading a version and writing the changes. The earlier Python comparison
+alone cannot provide that guarantee. See SQLAlchemy's
+[version counter documentation](https://docs.sqlalchemy.org/en/20/orm/versioning.html).
+
+Flushing checks the write without committing it. The service commits only after `update`
+succeeds. On failure or an unfinished transaction, the unit of work rolls back and closes the
+session. Version checks cover these ORM writes; direct SQL and bulk writes must implement
+their own predicate and version increment. A wildcard bypasses the client's version check,
+but competing writes after the application's read can still produce a conflict.
+
+HTTP tests use fakes. The independent-connection MySQL regression tests live in
+[`test_sqlalchemy_book_updates.py`](../tests/integration/persistence/test_sqlalchemy_book_updates.py); their presence
+does not assert a live run. See [testing](testing.md) for execution and verification limits.
 
 ## Change guidance
 

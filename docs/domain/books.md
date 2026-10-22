@@ -20,8 +20,10 @@ See [decision 0001](../decisions/0001-learning-strategy.md) for the learning str
 | Title | Book title text, trimmed and validated by the entity |
 | Author | A single text field; there is no separate author entity |
 | Create book | Register a book whose ISBN is not already present |
-| Rename book | Change the title on a domain object; not an application or HTTP operation yet |
-| Repository | Application port for finding books by ID or ISBN and adding a book |
+| Rename book | Change the title on a domain object using the title invariant |
+| Revise details | Change title, author, or both while preserving omitted fields |
+| Version | Persisted counter used to detect conflicting updates; initially 1 |
+| Repository | Application port for finding, adding, and conditionally updating books |
 | Unit of work | Application port grouping repository work with an explicit commit |
 
 ## Implemented invariants
@@ -39,10 +41,12 @@ Examples: `9780132350884` is accepted; `9780132350885` fails its checksum; `1234
 
 ### Book
 
-[`Book`](../../src/bookstore_api/domain/books/book.py) validates title and author on construction. `rename` applies the same title validation.
+[`Book`](../../src/bookstore_api/domain/books/book.py) validates title and author on construction.
+`rename` and `revise_details` apply the same invariants when changing details.
 
 - Leading and trailing whitespace is removed with `strip()`.
-- The resulting text must contain between 1 and 255 characters, inclusive.
+- The resulting title must contain between 1 and 100 characters, inclusive.
+- The resulting author must contain between 1 and 80 characters, inclusive.
 - Internal whitespace is preserved.
 - `Book.create` generates a UUID using `uuid4`.
 - Reconstruction supplies the existing UUID rather than calling `create`.
@@ -51,13 +55,27 @@ For example, title `"  Clean Code  "` becomes `"Clean Code"`; a whitespace-only 
 
 The class exposes mutable `id` and `isbn` attributes. Stronger immutability is not currently enforced. Use explicit domain behavior for intended changes rather than treating public attributes as an update API.
 
+`revise_details` validates both proposed values before assigning either. If author validation
+fails, an otherwise valid proposed title is not applied. `None` means preserve that field to
+internal callers; HTTP rejects explicit JSON null and uses omission for preservation. The
+application rejects an update with no supplied details. The repository increments the version
+when persisting an accepted update, including when the text remains unchanged.
+
+HTTP schemas also enforce these text limits and trim whitespace. That duplication protects two
+different boundaries: Pydantic supplies request errors and OpenAPI constraints, while the domain
+protects every caller, including scripts and application tests that never use HTTP. Shared
+length constants prevent the limits from drifting; domain code does not depend on Pydantic.
+
 ### Creation and uniqueness
 
 [`CreateBookService`](../../src/bookstore_api/application/books/create_book.py) checks ISBN uniqueness through its repository. A duplicate causes `BookAlreadyExistsError`, with no add or commit requested by the service.
 
 On success, the service adds one book, commits, and returns its ID. Title/author failures occur inside the unit-of-work context; ISBN validation occurs before entering it.
 
-The [`books` table](../../src/bookstore_api/infrastructure/persistence/models/book.py) also has a unique ISBN constraint. A concurrent duplicate can pass the preliminary lookup and fail at commit. That database failure is not yet translated into the application error.
+The [`books` table](../../src/bookstore_api/infrastructure/persistence/models/book.py) also has a
+unique ISBN constraint. A concurrent duplicate can pass the preliminary lookup and fail at
+commit. The unit of work translates MySQL duplicate-key errors for `uq_books_isbn` into
+`BookAlreadyExistsError`; unrelated integrity failures propagate.
 
 ## Examples and evidence
 
