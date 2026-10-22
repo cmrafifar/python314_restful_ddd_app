@@ -1,3 +1,4 @@
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
@@ -24,3 +25,16 @@ class BookDetailsResponse(BaseModel):
     isbn: str
     title: str
     author: str
+
+
+class BookNotFoundDetail(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    code: Literal["book_not_found"]
+    message: str
+
+
+class BookNotFoundResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    detail: BookNotFoundDetail

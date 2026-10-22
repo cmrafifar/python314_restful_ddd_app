@@ -12,19 +12,6 @@ Preserve familiar DDD and hexagonal boundaries while using idiomatic Python. Pro
 
 The AI collaborator may choose contrived business requirements and explain consequential choices. Keep the exercise coherent: the chosen scope is a bookstore catalog, where each Book represents one edition in one format. The [domain document](docs/domain/books.md) defines the terminology; [decision 0001](docs/decisions/0001-learning-strategy.md) records this direction.
 
-The next planned learning slice is to create a book through HTTP, persist it in MySQL, retrieve it, and verify validation, duplicate handling, and transaction behavior. This describes the learning direction, not implemented endpoints.
-
-## Current scope
-
-- A `Book` entity and immutable `ISBN` value object.
-- A create-book use case with duplicate-ISBN detection, exposed through `POST /api/v1/books`.
-- Repository and unit-of-work ports, SQLAlchemy persistence adapters, and a books-table migration.
-- A `GET /health` endpoint returning `{"status": "ok"}`.
-
-Book retrieval is not implemented yet. See [API conventions](docs/api-conventions.md) for the
-create endpoint's contract and validation limits. Inventory, ordering, pricing, and
-authentication are outside the current implementation.
-
 ## Quick start
 
 Run from the repository root with Python 3.14+ and `uv` installed:
@@ -37,9 +24,7 @@ chmod 600 .env
 uv run --env-file .env uvicorn bookstore_api.main:app --reload
 ```
 
-Open `/health` or the generated API documentation at `/docs` on `http://127.0.0.1:8000`.
-
-`APP_DB_PASSWORD` is required when settings are loaded, including application import. The health endpoint does not connect to MySQL. Settings do not automatically load `.env`; see [development](docs/development.md) for configuration and database setup.
+`APP_DB_PASSWORD` is required when settings are loaded, including application import. Settings do not automatically load `.env`; see [development](docs/development.md) for configuration and database setup.
 
 To start the API and MySQL through containers:
 
@@ -49,6 +34,13 @@ podman compose up --build -d
 
 First configure `.env` using [.env.example](.env.example); see [development](docs/development.md#local-api-and-database).
 Compose starts services but does not apply database migrations. Follow the [migration guide](migrations/README.md) before exercising persistence.
+
+## API documentation
+
+With the application running, use [Swagger UI](http://127.0.0.1:8000/docs) to explore and try
+available operations, or [ReDoc](http://127.0.0.1:8000/redoc) to browse their contracts.
+The generated [OpenAPI document](http://127.0.0.1:8000/openapi.json) describes request and response
+schemas. Maintain endpoint contracts in route metadata and HTTP schemas so these views stay current.
 
 ## Tests
 
@@ -65,6 +57,16 @@ No database or credentials are required. MySQL tests are skipped unless explicit
 First configure `.env.test` using [.env.test.example](.env.test.example). The command starts a
 separate MySQL service, applies migrations, checks schema drift, and runs the persistence tests.
 See [testing](docs/testing.md#mysql-integration-setup) for setup and lifecycle details.
+
+## Quality checks
+
+Run from the repository root:
+
+```bash
+uv run ruff check .
+uv run ruff format --check .
+uv run basedpyright
+```
 
 ## Documentation
 

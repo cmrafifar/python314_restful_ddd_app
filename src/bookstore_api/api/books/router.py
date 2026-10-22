@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, status
 
 from bookstore_api.api.books.schemas import (
     BookDetailsResponse,
+    BookNotFoundResponse,
     BookResponse,
     CreateBookRequest,
 )
@@ -53,6 +54,12 @@ def create_book(
     "/{book_id}",
     response_model=BookDetailsResponse,
     status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_404_NOT_FOUND: {
+            "model": BookNotFoundResponse,
+            "description": "No book exists with the requested ID.",
+        },
+    },
 )
 def get_book(
     book_id: UUID,
