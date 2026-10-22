@@ -12,7 +12,13 @@ FastAPI exposes generated documentation at `/docs` and `/redoc`, and its schema 
 `author`. Extra fields are rejected. Success returns HTTP 201 and `{"id": "<uuid>"}`.
 Duplicate ISBNs reported as `BookAlreadyExistsError` return HTTP 409 with
 `{"detail": "<message>"}`. Request shape errors use FastAPI's standard HTTP 422 validation
-response. No `Location` header is emitted because no book retrieval route exists.
+response. No `Location` header is emitted by the create endpoint.
+
+`GET /api/v1/books/{book_id}` returns the book's `id`, `isbn`, `title`, and `author`
+with HTTP 200. A missing book returns HTTP 404 with
+`{"detail": {"code": "book_not_found", "message": "Book not found"}}`.
+Invalid UUID path parameters retain FastAPI's standard HTTP 422 validation response.
+The structured 404 detail does not change the existing duplicate-ISBN response format.
 
 Current limitation: domain `ValueError` failures, such as an invalid ISBN checksum, are not
 translated into client errors yet and result in HTTP 500. There are no custom application

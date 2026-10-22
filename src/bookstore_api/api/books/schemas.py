@@ -15,3 +15,12 @@ class BookResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: UUID
+
+
+class BookDetailsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: UUID
+    isbn: str
+    title: str
+    author: str

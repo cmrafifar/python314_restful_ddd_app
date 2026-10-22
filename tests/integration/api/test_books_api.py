@@ -8,6 +8,10 @@ from bookstore_api.application.books.create_book import (
     CreateBookResult,
     CreateBookService,
 )
+from bookstore_api.application.books.get_book_details import (
+    BookNotFoundError,
+    GetBookDetailsService,
+)
 from bookstore_api.application.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from bookstore_api.main import create_app
 from tests.fakes.book_repository import FakeBookRepository
@@ -103,6 +107,27 @@ def test_create_book_rejects_missing_fields() -> None:
         ("body", "title"),
         ("body", "author"),
     }
+
+
+def test_get_book_returns_404_with_stable_error_code() -> None:
+    service = create_autospec(GetBookDetailsService, instance=True)
+    service.execute.side_effect = BookNotFoundError("Missing book")
+    book_id = uuid4()
+
+    overrides = Provider(scope=Scope.REQUEST)
+    overrides.provide(lambda: service, provides=GetBookDetailsService, override=True)
+
+    with TestClient(create_app(provider_overrides=[overrides])) as client:
+        response = client.get(f"/api/v1/books/{book_id}")
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "detail": {
+            "code": "book_not_found",
+            "message": "Book not found",
+        },
+    }
+    service.execute.assert_called_once_with(book_id)
 
 
 def test_app_disposes_database_engine_on_shutdown() -> None:
