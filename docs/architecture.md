@@ -179,7 +179,9 @@ This explicit statement supplies its own version predicate; it does not use ORM 
 version checking or synchronize loaded ORM instances. Each use case owns a short-lived unit
 of work, and callers should use repository reads rather than retained ORM instances after deletion.
 The caller must commit; leaving the unit of work without committing rolls back the deletion.
-This adapter capability does not imply the DELETE HTTP endpoint is complete.
+The DELETE endpoint translates HTTP preconditions into application version expectations.
+Its route metadata defines the response contract; [API conventions](api-conventions.md#conditional-writes)
+defines the shared precondition policy.
 
 ## Change guidance
 

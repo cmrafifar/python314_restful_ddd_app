@@ -77,7 +77,7 @@ Start with [AGENTS.md](AGENTS.md) for task-specific reading and validation comma
 - [Coding guidelines](docs/coding-guidelines.md): Python style and practical design rules.
 - [Books domain](docs/domain/books.md): terminology, invariants, and unresolved questions.
 - [Testing](docs/testing.md): test boundaries, doubles, and database requirements.
-- [API conventions](docs/api-conventions.md): existing HTTP behavior and endpoint guidance.
+- [API conventions](docs/api-conventions.md): shared HTTP patterns and adapter boundaries.
 - [Development](docs/development.md): configuration, tools, containers, and troubleshooting.
 - [Codex how-tos](docs/ai/codex.md): human reference for command approvals and practical agent setup; excluded from routine agent context.
 - [Learning notes](learnings/): for human eyes only; AI agents must ignore this directory unless explicitly asked to work on its files.

@@ -10,7 +10,7 @@ _IF_MATCH = re.compile(rf"[ \t]*(?:\*|{_ENTITY_TAG}(?:[ \t]*,[ \t]*{_ENTITY_TAG}
 _TAGS = re.compile(r'(W/)?"([\x21\x23-\x7e\x80-\xff]*)"')
 
 IF_MATCH_DESCRIPTION = (
-    "Required for updates. Copy the quoted ETag from GET, for example "
+    "Required for updates and deletion. Copy the quoted ETag from GET, for example "
     '"book-5d23d9a6-4198-4fca-ae01-f962d7b71401-v1". '
     "A comma-separated list succeeds if any strong tag matches. Weak tags never match. "
     "* requires only that the book exist and does not protect against a stale client. "

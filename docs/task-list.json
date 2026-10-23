@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "project": "Python 3.14 Bookstore API",
-  "updated_on": "2026-10-22",
+  "updated_on": "2026-10-23",
   "purpose": "Track implemented learning artifacts and remaining curriculum without treating proposed work as authorization.",
   "status_definitions": {
     "complete": "The described artifact exists or the discussion was completed. This does not assert a fresh test run or live infrastructure verification.",
@@ -26,7 +26,7 @@
     "component": 4,
     "title": "Delete books and define resource lifecycle",
     "task_ids": ["BOOK-016"],
-    "next_action": "Continue BOOK-016 one piece at a time with the learner handcoding. The deletion contract is agreed. Next implement FakeBookRepository.delete, then application tests, DI registration, HTTP routing/error translation and tests, documentation, and final quality checks.",
+    "next_action": "BOOK-016 is complete. Next proposed component is BOOK-017: agree on collection representation, filters, ordering, and query bounds before implementation.",
     "previous_component_verification": {
       "task_ids": ["BOOK-011", "BOOK-012", "BOOK-013", "BOOK-014", "BOOK-015"],
       "fresh_checks_run_for_this_inventory": true,
@@ -203,19 +203,33 @@
       "area": "lesson-4-component-4",
       "title": "Delete books and define resource lifecycle",
       "description": "Agree on deletion semantics, repeated deletion, missing resources, and concurrency preconditions before adding the domain/application/HTTP behavior needed.",
-      "status": "todo",
+      "status": "complete",
       "scope": "accepted",
-      "implementation_state": "Contract agreed: hard deletion with required If-Match, 204 success, 404 for missing or already deleted books, existing 400/428/412 precondition errors, and ISBN reuse. Command, service, port, and conditional SQL DELETE adapter exist. The service checks client expectations; the adapter deletes atomically by ID and version. Five MySQL deletion tests cover deletion/ISBN reuse, missing rows, rollback, concurrent updates, and concurrent deletion. The latest ./scripts/test_integration.py run passed all 55 integration tests. HTTP wiring and application coverage remain unfinished.",
-      "remaining_work": [
-        "Implement version-aware deletion in FakeBookRepository.",
-        "Test service success and rejection paths, including no commit on failure.",
-        "Register DeleteBookService with Dishka.",
-        "Register the DELETE route with 204 and translate missing/version errors into 404/412.",
-        "Test the agreed HTTP contract and document it in OpenAPI and project documentation.",
-        "Run final pytest, MySQL, Ruff, formatting, BasedPyright, and whitespace checks."
+      "implementation_state": "Hard deletion is wired through command, service, repository port, SQLAlchemy and fake adapters, Dishka, and DELETE routing. Service tests cover matching versions, wildcard, missing records, and conflicts without commit. HTTP tests cover empty 204 without ETag, repeated/missing deletion, header preconditions, stale clients, repository conflicts, invalid UUIDs, and OpenAPI. API, domain, architecture, and testing documentation describe the agreed contract.",
+      "remaining_work": [],
+      "acceptance_criteria": [
+        "Agree on lifecycle and HTTP contract.",
+        "Implement and test the agreed slice."
       ],
-      "acceptance_criteria": ["Agree on lifecycle and HTTP contract.", "Implement and test the agreed slice."],
-      "depends_on": ["BOOK-015"]
+      "depends_on": [
+        "BOOK-015"
+      ],
+      "evidence": [
+        "src/bookstore_api/application/books/delete_book.py",
+        "src/bookstore_api/api/books/router.py",
+        "src/bookstore_api/infrastructure/persistence/repositories/sqlalchemy_book_repository.py",
+        "tests/unit/application/books/test_delete_book.py",
+        "tests/integration/api/test_book_deletes.py",
+        "tests/integration/persistence/test_sqlalchemy_book_deletes.py",
+        "docs/api-conventions.md",
+        "docs/domain/books.md"
+      ],
+      "verification": {
+        "date": "2026-10-23",
+        "local": "uv run pytest: 107 passed, 14 MySQL tests skipped. Ruff lint/format, BasedPyright, and whitespace checks passed.",
+        "mysql": "./scripts/test_integration.py: 68 passed, including all 14 live MySQL persistence tests and 5 deletion cases. Alembic upgrade head and schema drift check passed.",
+        "limits": "HTTP tests use fake persistence; separate live MySQL tests prove conditional deletion, ISBN reuse, rollback, and competing writers. No production deployment or fresh database rebuild was performed."
+      }
     },
     {
       "id": "BOOK-017",

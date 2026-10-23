@@ -23,7 +23,7 @@ See [decision 0001](../decisions/0001-learning-strategy.md) for the learning str
 | Rename book | Change the title on a domain object using the title invariant |
 | Revise details | Change title, author, or both while preserving omitted fields |
 | Version | Persisted counter used to detect conflicting updates; initially 1 |
-| Repository | Application port for finding, adding, and conditionally updating books |
+| Repository | Application port for finding, adding, conditionally updating, and deleting books |
 | Unit of work | Application port grouping repository work with an explicit commit |
 
 ## Implemented invariants
@@ -77,6 +77,18 @@ unique ISBN constraint. A concurrent duplicate can pass the preliminary lookup a
 commit. The unit of work translates MySQL duplicate-key errors for `uq_books_isbn` into
 `BookAlreadyExistsError`; unrelated integrity failures propagate.
 
+### Deletion and ISBN reuse
+
+Deleting a book permanently removes its catalog record; no soft-delete state or tombstone
+is kept. The ISBN becomes available for a new record, whose UUID is distinct from the deleted
+record's identity. Missing records are rejected rather than treated as successful deletions.
+
+The application checks the caller's version expectations against the loaded book. The
+repository deletes only when the stored version still matches that book, preventing a
+concurrent update or deletion from being silently accepted. The unit of work must commit
+the deletion; leaving without commit rolls it back. No domain mutation is needed to delete
+a record. HTTP preconditions and statuses belong to the adapter; see [API conventions](../api-conventions.md).
+
 ## Examples and evidence
 
 - [Book entity tests](../../tests/unit/domain/books/test_book.py): creation, title rejection, and rename behavior.
@@ -93,6 +105,6 @@ These questions are not requirements or authorization to add behavior:
 - Will multiple authors require richer modeling, or remain display text?
 - Should the system normalize formatted ISBNs, accept ISBN-10, or enforce ISBN prefixes?
 - Are ISBN and record identity ever allowed to change?
-- What future operations, if any, need inventory, pricing, deletion, or availability rules?
+- What future operations, if any, need inventory, pricing, or availability rules?
 
 Resolve a question when a concrete use case needs it. Record the chosen meaning here and any consequential design choice in [decision records](../decisions/README.md).

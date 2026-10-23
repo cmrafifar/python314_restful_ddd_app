@@ -17,7 +17,7 @@ from bookstore_api.api.books.schemas import (
     PatchBookRequest,
     ReplaceBookRequest,
 )
-from bookstore_api.api.responses import CONDITIONAL_UPDATE_RESPONSES
+from bookstore_api.api.responses import CONDITIONAL_UPDATE_RESPONSES, ErrorResponse
 from bookstore_api.application.books.commands import (
     CreateBookCommand,
     DeleteBookCommand,
@@ -59,7 +59,7 @@ def create_book(
     except BookAlreadyExistsError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=str(exc),
+            detail="A resource with the supplied ISBN already exists",
         ) from exc
 
     return BookResponse(id=result.book_id)
@@ -83,7 +83,7 @@ def get_book(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={
                 "code": "book_not_found",
-                "message": "Book not found",
+                "message": "Resource not found",
             },
         ) from exc
     response.headers["ETag"] = book_etag(book_id, book_details_result.version)
@@ -94,11 +94,12 @@ def get_book(
     "/{book_id}",
     response_model=BookDetailsResponse,
     responses={**CONDITIONAL_UPDATE_RESPONSES, **BOOK_NOT_FOUND_RESPONSES},
-    summary="Replace a book's writable details",
+    summary="Replace the resource's writable details",
     description=(
         "Requires title and author; ISBN and ID are read-only. Uses If-Match to prevent lost updates. "
         "Trims outer whitespace. Returns the updated representation, but no ETag because PUT input "
-        "may be transformed; GET the book to obtain its next validator. Does not create missing books."
+        "may be transformed; GET the resource to obtain its next validator. "
+        "Does not create missing resources."
     ),
 )
 def replace_book(
@@ -115,7 +116,7 @@ def replace_book(
     "/{book_id}",
     response_model=BookDetailsResponse,
     responses={**CONDITIONAL_UPDATE_RESPONSES, **BOOK_READ_RESPONSES},
-    summary="Change selected book details",
+    summary="Change selected resource details",
     description=(
         "Send title, author, or both as application/json. Omitted fields remain unchanged. "
         "An empty object, explicit null, unknown fields, and invalid text return 422. "
@@ -138,9 +139,23 @@ def patch_book(
 @router.delete(
     "/{book_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    responses={**CONDITIONAL_UPDATE_RESPONSES, **BOOK_NOT_FOUND_RESPONSES},
-    summary="delete book",
-    description=("Requires If-Match"),
+    responses={
+        **CONDITIONAL_UPDATE_RESPONSES,
+        **BOOK_NOT_FOUND_RESPONSES,
+        status.HTTP_412_PRECONDITION_FAILED: {
+            "model": ErrorResponse,
+            "description": (
+                "No strong tag matched, or the resource changed or was deleted before the "
+                "operation completed. Retrieve its current state and reconcile before retrying."
+            ),
+        },
+    },
+    summary="Delete the resource",
+    description=(
+        "Permanently deletes the resource and frees its ISBN for reuse. Requires If-Match; "
+        "supports strong tag lists and *. Success returns an empty 204 without ETag. "
+        "Missing or already deleted resources return 404; version conflicts return 412."
+    ),
 )
 def delete_book(
     book_id: UUID,
@@ -155,7 +170,7 @@ def delete_book(
     except BookNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={"code": "book_not_found", "message": "Book not found"},
+            detail={"code": "book_not_found", "message": "Resource not found"},
         ) from exc
 
     except BookVersionConflictError as exc:
@@ -163,7 +178,10 @@ def delete_book(
             status_code=status.HTTP_412_PRECONDITION_FAILED,
             detail={
                 "code": "precondition_failed",
-                "message": "The book changed; retrieve it before deleting",
+                "message": (
+                    "The resource changed or was deleted; "
+                    "reconcile its current state before retrying"
+                ),
             },
         ) from exc
 
@@ -188,14 +206,17 @@ def _update_book(
     except BookNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={"code": "book_not_found", "message": "Book not found"},
+            detail={"code": "book_not_found", "message": "Resource not found"},
         ) from exc
     except BookVersionConflictError as exc:
         raise HTTPException(
             status_code=status.HTTP_412_PRECONDITION_FAILED,
             detail={
                 "code": "precondition_failed",
-                "message": "The book changed; retrieve it before updating",
+                "message": (
+                    "The resource changed or was deleted; "
+                    "reconcile its current state before retrying"
+                ),
             },
         ) from exc
 
