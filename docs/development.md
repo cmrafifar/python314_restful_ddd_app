@@ -132,7 +132,7 @@ For schema changes, generate a revision, review its operations, then apply and v
 
 Integration tests use the optional standalone `compose.test.yaml` stack, with its own MySQL
 service, network, volume, and host port 3308. After configuring `.env.test`, run
-`./scripts/test_integration.py` from the repository root. It starts MySQL, applies the shared
+`./scripts/test_integration.sh` from the repository root. It starts MySQL, applies the shared
 migrations, checks schema drift, and runs the integration suite. See
 [testing](testing.md#mysql-integration-setup) for setup and lifecycle commands. Default pytest
 runs skip MySQL tests.

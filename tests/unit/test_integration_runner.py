@@ -1,107 +1,77 @@
+import json
+import os
+import shutil
 import subprocess
-from unittest.mock import Mock
+import sys
+from pathlib import Path
 
 import pytest
 from sqlalchemy.engine import make_url
 
-from scripts import test_integration as runner
 
-
-@pytest.fixture
-def local_environment() -> dict[str, str]:
-    return {
-        "APP_DB_HOST": "127.0.0.1",
-        "APP_DB_PORT": "3308",
-        "APP_DB_NAME": "bookstore_test",
-        "APP_DB_USER": "bookstore_test",
-        "APP_DB_PASSWORD": "test-password-with-@:/#%",
-        "TEST_MYSQL_ROOT_PASSWORD": "test-root-password",
-    }
-
-
-def test_runner_derives_matching_connection_settings(
-    local_environment: dict[str, str],
+@pytest.mark.parametrize("failed_step", [None, "up", "python", "upgrade", "check"])
+def test_bash_runner_uses_test_database_and_stops_on_failure(
+    tmp_path: Path, failed_step: str | None
 ) -> None:
-    local_environment["PYTEST_ADDOPTS"] = "--collect-only"
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    runner = scripts / "test_integration.sh"
+    shutil.copyfile(Path(__file__).resolve().parents[2] / "scripts/test_integration.sh", runner)
+    (tmp_path / ".env.test").write_text(
+        "APP_DB_HOST=production.example.com\nAPP_DB_PORT=3307\n"
+        "APP_DB_NAME=bookstore\nAPP_DB_USER=root\n"
+        "APP_DB_PASSWORD='test-password-with-@:/#%$'\nTEST_MYSQL_ROOT_PASSWORD=test-root\n"
+    )
+    commands = tmp_path / "commands.jsonl"
+    stub = tmp_path / "command"
+    stub.write_text(
+        f"#!{sys.executable}\n"
+        "import json, os, subprocess, sys\n"
+        "from pathlib import Path\n"
+        "arguments = sys.argv[1:]\n"
+        "with open(os.environ['COMMAND_LOG'], 'a') as log:\n"
+        "    selected = {key: value for key, value in os.environ.items() "
+        "if key.startswith('APP_DB_') or key in ('BOOKSTORE_TEST_DATABASE_URL', 'PYTEST_ADDOPTS')}\n"
+        "    log.write(json.dumps({'arguments': arguments, 'environment': selected}) + '\\n')\n"
+        "if os.environ['FAILED_STEP'] in arguments:\n"
+        "    sys.exit(7)\n"
+        "if Path(sys.argv[0]).name == 'uv' and 'python' in arguments:\n"
+        "    sys.exit(subprocess.call([sys.executable, '-'], env=os.environ))\n"
+    )
+    stub.chmod(0o755)
+    (tmp_path / "podman").symlink_to(stub)
+    (tmp_path / "uv").symlink_to(stub)
+    environment = dict(os.environ)
+    environment.update(
+        PATH=f"{tmp_path}:{os.environ['PATH']}",
+        COMMAND_LOG=str(commands),
+        FAILED_STEP=failed_step or "none",
+        PYTEST_ADDOPTS="--collect-only",
+        BOOKSTORE_TEST_DATABASE_URL="mysql+pymysql://wrong-target/bookstore",
+    )
 
-    environment = runner.build_environment(local_environment)
-    url = make_url(environment["BOOKSTORE_TEST_DATABASE_URL"])
+    result = subprocess.run(["bash", str(runner)], env=environment, check=False)
 
-    assert url.get_backend_name() == "mysql"
-    assert url.host == environment["APP_DB_HOST"]
-    assert url.port == int(environment["APP_DB_PORT"])
-    assert url.database == environment["APP_DB_NAME"]
-    assert url.username == environment["APP_DB_USER"]
-    assert url.password == environment["APP_DB_PASSWORD"]
-    assert "PYTEST_ADDOPTS" not in environment
-    assert "BOOKSTORE_TEST_DATABASE_URL" not in local_environment
-
-
-@pytest.mark.parametrize(
-    ("name", "value"),
-    [
-        ("APP_DB_HOST", "production.example.com"),
-        ("APP_DB_PORT", "3307"),
-        ("APP_DB_NAME", "bookstore"),
-        ("APP_DB_USER", "root"),
-        ("APP_DB_PASSWORD", ""),
-        ("APP_DB_PASSWORD", "replace_with_local_test_password"),
-        ("TEST_MYSQL_ROOT_PASSWORD", ""),
-    ],
-)
-def test_runner_rejects_invalid_settings_before_starting_containers(
-    local_environment: dict[str, str],
-    monkeypatch: pytest.MonkeyPatch,
-    name: str,
-    value: str,
-) -> None:
-    local_environment[name] = value
-    monkeypatch.setattr(runner.os, "environ", local_environment)
-    run = Mock()
-    monkeypatch.setattr(runner.subprocess, "run", run)
-
-    with pytest.raises(ValueError, match=name):
-        runner.main()
-
-    run.assert_not_called()
-
-
-@pytest.mark.parametrize(
-    "database_url",
-    [
-        "mysql+pymysql://bookstore_test:stale-password@127.0.0.1:3307/bookstore_test",
-        "malformed-url-with-a-password",
-    ],
-)
-def test_runner_rejects_conflicting_test_url(
-    local_environment: dict[str, str], database_url: str
-) -> None:
-    local_environment["BOOKSTORE_TEST_DATABASE_URL"] = database_url
-
-    with pytest.raises(ValueError, match="conflicting BOOKSTORE_TEST_DATABASE_URL") as error:
-        runner.build_environment(local_environment)
-
-    assert database_url not in str(error.value)
-
-
-@pytest.mark.parametrize("failed_command", ["up", "upgrade", "check"])
-def test_runner_does_not_run_tests_when_preparation_fails(
-    local_environment: dict[str, str],
-    monkeypatch: pytest.MonkeyPatch,
-    failed_command: str,
-) -> None:
-    monkeypatch.setattr(runner.os, "environ", local_environment)
-    monkeypatch.setattr(runner, "wait_for_mysql", Mock())
-    commands: list[list[str]] = []
-
-    def run(command: list[str], **kwargs: object) -> None:
-        commands.append(command)
-        if failed_command in command:
-            raise subprocess.CalledProcessError(1, command)
-
-    monkeypatch.setattr(runner.subprocess, "run", run)
-
-    with pytest.raises(subprocess.CalledProcessError):
-        runner.main()
-
-    assert all("pytest" not in command for command in commands)
+    assert result.returncode == (7 if failed_step else 0)
+    calls = [json.loads(line) for line in commands.read_text().splitlines()]
+    if failed_step:
+        assert failed_step in calls[-1]["arguments"]
+        assert not any("pytest" in call["arguments"] for call in calls)
+    else:
+        last = calls[-1]
+        assert last["arguments"] == [
+            "run",
+            "--locked",
+            "pytest",
+            "tests/integration",
+            "--run-integration",
+        ]
+        target = make_url(last["environment"]["BOOKSTORE_TEST_DATABASE_URL"])
+        assert (target.host, target.port, target.database, target.username) == (
+            "127.0.0.1",
+            3308,
+            "bookstore_test",
+            "bookstore_test",
+        )
+        assert target.password == "test-password-with-@:/#%$"
+        assert "PYTEST_ADDOPTS" not in last["environment"]

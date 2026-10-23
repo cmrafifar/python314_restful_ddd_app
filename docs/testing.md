@@ -69,7 +69,7 @@ uv run pytest tests/integration/persistence/test_sqlalchemy_book_updates.py --ru
 ```
 
 This requires `BOOKSTORE_TEST_DATABASE_URL` and the same test-target safeguards described below.
-Prefer `./scripts/test_integration.py` for the full provision/migrate/check/test workflow.
+Prefer `./scripts/test_integration.sh` for the full provision/migrate/check/test workflow.
 
 ## Required regression evidence
 
@@ -204,20 +204,25 @@ interpolation concerns. The ignored `.env.test` is plaintext; do not commit cred
 Run from the repository root:
 
 ```bash
-./scripts/test_integration.py
+./scripts/test_integration.sh
 ```
 
-This executable uses `uv` to load `.env.test` and the locked Python environment. It validates the
-local test target before starting containers or applying migrations, starts the standalone
-`bookstore-integration` Compose project, and waits for an authenticated connection. It then runs
-the shared Alembic migrations, checks for model/schema differences, and runs the integration
+This Bash script sources `.env.test`, fixes the database target to the local test stack, and
+starts the standalone `bookstore-integration` Compose project. It waits up to 90 seconds for
+an authenticated query inside the MySQL container. It then uses `uv run --locked` to apply
+the shared Alembic migrations, check for model/schema differences, and run the integration
 suite. A failed prerequisite stops the sequence. The service remains available for later runs.
+
+Keep `.env.test` in Bash-compatible assignment syntax. Quote passwords containing shell
+characters with single quotes, for example `APP_DB_PASSWORD='local$password'`. Sourcing this
+file executes shell code, so use only your own trusted local configuration.
 
 Compose and Alembic use the same `APP_DB_PASSWORD`. The runner builds
 `BOOKSTORE_TEST_DATABASE_URL` from `APP_DB_*`, including URL-encoding its password, so there is
-only one test password to maintain. Remove the old URL entry when migrating an existing
-`.env.test`; port 3307 changes to 3308. Exported shell variables override `uv --env-file` values;
-conflicting targets and URLs are rejected before migrations.
+only one test password to maintain. Values in `.env.test` override exported shell variables.
+The runner always uses `127.0.0.1:3308`, database/user `bookstore_test`, and replaces any existing
+`BOOKSTORE_TEST_DATABASE_URL`. Compose rejects missing or empty passwords; placeholder passwords
+are no longer checked by the runner. Inherited `PYTEST_ADDOPTS` is cleared.
 
 The shared migration history is the schema source of truth. Do not create test tables with
 `metadata.create_all()` or maintain a separate SQL schema. `alembic check` detects differences
