@@ -26,7 +26,7 @@
     "component": 5,
     "title": "List books with agreed filters",
     "task_ids": ["BOOK-017"],
-    "next_action": "BOOK-017 application tests pass. Prompt the user before proceeding with HTTP and live MySQL tests; do not advance to BOOK-018 yet.",
+    "next_action": "BOOK-017 is complete with application, HTTP, and live MySQL verification. Await explicit authorization before advancing to BOOK-018.",
     "previous_component_verification": {
       "task_ids": ["BOOK-011", "BOOK-012", "BOOK-013", "BOOK-014", "BOOK-015"],
       "fresh_checks_run_for_this_inventory": true,
@@ -236,11 +236,26 @@
       "area": "lesson-4-component-5",
       "title": "List books with agreed filters",
       "description": "Define a collection representation, supported filters, stable ordering, and bounded queries using existing architectural boundaries.",
-      "status": "todo",
+      "status": "complete",
       "scope": "accepted",
-      "implementation_state": "Collection query/result records, service, repository port, fake and SQLAlchemy adapters, HTTP schemas and route, and Dishka registration are implemented. The agreed contract lives in route metadata and schemas. uv run pytest tests/unit/application/books/test_list_books.py passed all 29 application cases, covering result mapping, filtering, ordering, bounds, has_more, validation, and no commit using fake persistence. Focused Ruff and BasedPyright checks passed. HTTP and live MySQL listing tests remain pending.",
-      "remaining_work": ["Write HTTP tests after prompting the user.", "Write and run live MySQL listing tests for filter semantics, ordering, and bounds.", "Run quality checks and record final verification evidence."],
-      "acceptance_criteria": ["Agree on filters and ordering.", "Test empty collections, matching results, and invalid query parameters."]
+      "implementation_state": "Collection query/result records, service, repository port, fake and SQLAlchemy adapters, HTTP schemas and route, and Dishka registration are implemented. The agreed contract lives in route metadata and schemas. All 29 application cases, 35 HTTP cases, and 30 live MySQL listing cases pass. HTTP tests cover representations, filters, ordering, default and explicit limits, has_more, invalid queries, filter boundaries, absent collection ETag, and OpenAPI. MySQL tests prove literal matching, case and accent sensitivity, combined filters, ISBN ordering, repository bounds, and maximum-limit lookahead.",
+      "remaining_work": [],
+      "acceptance_criteria": ["Agree on filters and ordering.", "Test empty collections, matching results, and invalid query parameters."],
+      "evidence": [
+        "src/bookstore_api/application/books/list_books.py",
+        "src/bookstore_api/api/books/router.py",
+        "src/bookstore_api/api/books/schemas.py",
+        "src/bookstore_api/infrastructure/persistence/repositories/sqlalchemy_book_repository.py",
+        "tests/unit/application/books/test_list_books.py",
+        "tests/integration/api/test_book_listing.py",
+        "tests/integration/persistence/test_sqlalchemy_book_listing.py"
+      ],
+      "verification": {
+        "date": "2026-10-23",
+        "local": "uv run pytest: 171 passed, 44 MySQL tests skipped. uv run ruff check ., uv run ruff format --check ., and uv run basedpyright passed with no errors or warnings. Whitespace checks passed.",
+        "mysql": "./scripts/test_integration.sh: 133 integration tests passed, including all 44 live MySQL persistence cases and 30 listing cases. Alembic upgrade head and alembic check passed with no schema drift.",
+        "limits": "HTTP tests use fake persistence; separate MySQL tests prove database filter semantics, ordering, and bounds. Listing tests use the shared outer transaction to restore preexisting rows after temporary catalog replacement. No production deployment, fresh database rebuild, staging, or commit was performed."
+      }
     },
     {
       "id": "BOOK-018",
