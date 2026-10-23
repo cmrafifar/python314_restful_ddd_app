@@ -23,14 +23,15 @@
   ],
   "current_focus": {
     "lesson": 4,
-    "component": 3,
-    "title": "PUT/PATCH, validation, and conditional updates",
-    "task_ids": ["BOOK-011", "BOOK-012", "BOOK-013", "BOOK-014", "BOOK-015"],
-    "next_action": "Component 3 is complete. Obtain explicit authorization before starting Component 4 (BOOK-016: deletion and resource lifecycle).",
-    "verification": {
+    "component": 4,
+    "title": "Delete books and define resource lifecycle",
+    "task_ids": ["BOOK-016"],
+    "next_action": "The learner authorized continuing to BOOK-016. Agree on deletion lifecycle and HTTP semantics before implementation. Proposed for discussion: hard deletion with required If-Match, 204 on success, 404 for missing or already deleted books, existing 400/428/412 precondition errors, and ISBN reuse after deletion.",
+    "previous_component_verification": {
+      "task_ids": ["BOOK-011", "BOOK-012", "BOOK-013", "BOOK-014", "BOOK-015"],
       "fresh_checks_run_for_this_inventory": true,
-      "basis": "2026-10-22: fresh uv run pytest passed 95 tests with 9 MySQL cases skipped. uv run ruff check . and uv run ruff format --check . passed; uv run basedpyright reported 0 errors and warnings. Whitespace checks passed. Index left unchanged.",
-      "mysql": "2026-10-22: ./scripts/test_integration.py passed alembic upgrade head, alembic check (no schema drift), and all 50 integration tests, including 9 live MySQL persistence cases. Competing connections proved stale writes cannot overwrite accepted changes, unchanged writes advance the version, and uncommitted updates roll back details and version.",
+      "basis": "2026-10-22 continuation: fresh uv run pytest passed 87 tests with 9 MySQL cases skipped. uv run ruff check . and uv run ruff format --check . passed; uv run basedpyright reported 0 errors and warnings. Whitespace checks passed. Index left unchanged.",
+      "mysql": "2026-10-22 continuation: ./scripts/test_integration.py passed alembic upgrade head, alembic check (no schema drift), and all 50 integration tests, including 9 live MySQL persistence cases. Competing connections proved stale writes cannot overwrite accepted changes, unchanged writes advance the version, and uncommitted updates roll back details and version.",
       "deployment": "The isolated test database was already at head, so the runner did not reapply the revision. A standalone verification harness executed the actual 8c214e7a93b0 upgrade/downgrade functions against a connection-local temporary books table in test MySQL: oversized existing titles and authors were rejected before DDL with data preserved; valid boundary-length rows survived upgrade with version 1; omitted versions received server default 1; downgrade removed only the version column and preserved rows. Permanent tables were not downgraded. This verifies revision operations and preflight, not a fresh full Alembic deployment or production rollout."
     }
   },
@@ -179,7 +180,7 @@
       "description": "Add an integer version counter initialized to 1 without truncating existing text. Audit existing title/author lengths and document deployment and rollback consequences.",
       "status": "complete",
       "scope": "accepted",
-      "implementation_state": "Upgrade/downgrade and preflight reviewed; migration guide documents defaults, execution, rollout, rollback, and ETag invalidation. On 2026-10-22 the integration runner confirmed the test database is at head without schema drift. The actual revision functions passed live MySQL checks on a temporary table for incompatible-data rejection, existing-row preservation, version initialization, server default, and downgrade. This does not claim a fresh full Alembic deployment or production rollout; see current_focus.verification.",
+      "implementation_state": "Upgrade/downgrade and preflight reviewed; migration guide documents defaults, execution, rollout, rollback, and ETag invalidation. On 2026-10-22 the integration runner confirmed the test database is at head without schema drift. The actual revision functions passed live MySQL checks on a temporary table for incompatible-data rejection, existing-row preservation, version initialization, server default, and downgrade. This does not claim a fresh full Alembic deployment or production rollout; see current_focus.previous_component_verification.",
       "acceptance_criteria": ["Review upgrade/downgrade and existing-data preflight behavior.", "Document why text(\"1\") is a SQL expression for an integer default.", "Document migration execution and rollback requirements.", "Record user-owned MySQL verification separately from local checks."],
       "remaining_work": [],
       "evidence": ["migrations/versions/8c214e7a93b0_add_book_version.py", "src/bookstore_api/infrastructure/persistence/models/book.py", "migrations/README.md"]
@@ -191,7 +192,7 @@
       "description": "Keep rich OpenAPI response metadata beside the handlers, explain conditional updates in project documentation, and reconcile stale architecture statements with implemented behavior.",
       "status": "complete",
       "scope": "accepted",
-      "implementation_state": "Domain, architecture, API, testing, and migration documentation reviewed against implementation. Fresh local pytest, Ruff, formatting, BasedPyright, and whitespace checks pass. Live MySQL results for BOOK-013 and BOOK-014 verified on 2026-10-22 with limits recorded under current_focus.verification. Conventional Commit suggestion previously supplied; no staging or committing performed.",
+      "implementation_state": "Domain, architecture, API, testing, and migration documentation reviewed against implementation. Fresh local pytest, Ruff, formatting, BasedPyright, and whitespace checks pass. Live MySQL results for BOOK-013 and BOOK-014 verified on 2026-10-22 with limits recorded under current_focus.previous_component_verification. Conventional Commit suggestion previously supplied; no staging or committing performed.",
       "acceptance_criteria": ["OpenAPI documents update inputs, headers, success, validation, missing-resource, and precondition responses.", "Domain, architecture, API, and migration documentation agree with the reviewed implementation.", "Relevant pytest, Ruff, and BasedPyright checks pass.", "Report verification limits and provide a Conventional Commit suggestion without committing automatically."],
       "remaining_work": [],
       "evidence": ["src/bookstore_api/api/responses.py", "src/bookstore_api/api/books/responses.py", "docs/architecture.md", "docs/domain/books.md", "docs/api-conventions.md", "docs/testing.md"],
@@ -203,7 +204,8 @@
       "title": "Delete books and define resource lifecycle",
       "description": "Agree on deletion semantics, repeated deletion, missing resources, and concurrency preconditions before adding the domain/application/HTTP behavior needed.",
       "status": "todo",
-      "scope": "proposed",
+      "scope": "accepted",
+      "implementation_state": "The learner authorized starting this component. Deletion contract agreement is pending; no deletion behavior has been implemented.",
       "acceptance_criteria": ["Agree on lifecycle and HTTP contract.", "Implement and test the agreed slice."],
       "depends_on": ["BOOK-015"]
     },
