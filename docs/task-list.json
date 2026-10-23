@@ -26,7 +26,7 @@
     "component": 5,
     "title": "List books with agreed filters",
     "task_ids": ["BOOK-017"],
-    "next_action": "BOOK-017 code is implemented. Prompt the user to write tests as a separate step before adding tests or advancing to BOOK-018.",
+    "next_action": "BOOK-017 application tests pass. Prompt the user before proceeding with HTTP and live MySQL tests; do not advance to BOOK-018 yet.",
     "previous_component_verification": {
       "task_ids": ["BOOK-011", "BOOK-012", "BOOK-013", "BOOK-014", "BOOK-015"],
       "fresh_checks_run_for_this_inventory": true,
@@ -238,8 +238,8 @@
       "description": "Define a collection representation, supported filters, stable ordering, and bounded queries using existing architectural boundaries.",
       "status": "todo",
       "scope": "accepted",
-      "implementation_state": "Collection query/result records, service, repository port, fake and SQLAlchemy adapters, HTTP schemas and route, and Dishka registration are implemented. The agreed contract lives in route metadata and schemas. Tests have not been written or run for this component; test writing is a separate user-prompted step after implementation.",
-      "remaining_work": ["Write application and HTTP tests after prompting the user.", "Write and run live MySQL listing tests for filter semantics, ordering, and bounds.", "Run quality checks and record final verification evidence."],
+      "implementation_state": "Collection query/result records, service, repository port, fake and SQLAlchemy adapters, HTTP schemas and route, and Dishka registration are implemented. The agreed contract lives in route metadata and schemas. uv run pytest tests/unit/application/books/test_list_books.py passed all 29 application cases, covering result mapping, filtering, ordering, bounds, has_more, validation, and no commit using fake persistence. Focused Ruff and BasedPyright checks passed. HTTP and live MySQL listing tests remain pending.",
+      "remaining_work": ["Write HTTP tests after prompting the user.", "Write and run live MySQL listing tests for filter semantics, ordering, and bounds.", "Run quality checks and record final verification evidence."],
       "acceptance_criteria": ["Agree on filters and ordering.", "Test empty collections, matching results, and invalid query parameters."]
     },
     {
