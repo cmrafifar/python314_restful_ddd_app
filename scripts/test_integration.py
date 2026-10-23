@@ -15,6 +15,7 @@ from sqlalchemy.exc import ArgumentError, OperationalError
 ROOT = Path(__file__).resolve().parents[1]
 
 
+# Used Mapping (akin to php's \ArrayAccess) which allows to handle different dictionary classes + dict
 def build_environment(source: Mapping[str, str]) -> dict[str, str]:
     expected = {
         "APP_DB_HOST": "127.0.0.1",

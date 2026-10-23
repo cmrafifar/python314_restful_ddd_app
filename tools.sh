@@ -64,11 +64,11 @@ function docker_migrations_generate() {
 
 
 function docker_migrations_apply() {
-  uv run alembic upgrade head
+  uv run --locked alembic upgrade head
   
-  uv run alembic current
+  uv run --locked alembic current
 
-  uv run alembic history --verbose
+  uv run --locked alembic history --verbose
 }
 
 

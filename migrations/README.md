@@ -70,7 +70,7 @@ precedence over file values. Container environment variables are not automatical
 on the host.
 
 Integration tests use the same migration history in a separate MySQL service. Run
-`./scripts/test_integration.py` to provision that service, migrate `bookstore_test`, check drift,
+`./scripts/test_integration.sh` to provision that service, migrate `bookstore_test`, check drift,
 and run its tests. See [testing](../docs/testing.md#mysql-integration-setup) for `.env.test` setup.
 
 ## 3. Initialize Alembic
@@ -500,7 +500,7 @@ uv run alembic check
 Apply the migration before starting application code that selects or writes `version`. Check
 the actual table and run the MySQL integration suite; file presence or offline SQL alone does
 not prove application, existing-data compatibility, or concurrent-write behavior. The isolated
-test workflow is `./scripts/test_integration.py`; see [testing](../docs/testing.md).
+test workflow is `./scripts/test_integration.sh`; see [testing](../docs/testing.md).
 
 To review only this revision's SQL without connecting to MySQL:
 

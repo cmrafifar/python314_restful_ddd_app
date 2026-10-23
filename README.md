@@ -51,7 +51,7 @@ uv run pytest
 No database or credentials are required. MySQL tests are skipped unless explicitly enabled:
 
 ```bash
-./scripts/test_integration.py
+./scripts/test_integration.sh
 ```
 
 First configure `.env.test` using [.env.test.example](.env.test.example). The command starts a
