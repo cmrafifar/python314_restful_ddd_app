@@ -2,7 +2,7 @@ from typing import Annotated
 from uuid import UUID
 
 from dishka.integrations.fastapi import DishkaSyncRoute, FromDishka
-from fastapi import APIRouter, Header, HTTPException, Response, status
+from fastapi import APIRouter, Header, HTTPException, Query, Response, status
 
 from bookstore_api.api.books.conditional_requests import (
     IF_MATCH_DESCRIPTION,
@@ -12,6 +12,8 @@ from bookstore_api.api.books.conditional_requests import (
 from bookstore_api.api.books.responses import BOOK_NOT_FOUND_RESPONSES, BOOK_READ_RESPONSES
 from bookstore_api.api.books.schemas import (
     BookDetailsResponse,
+    BookListParams,
+    BookListResponse,
     BookResponse,
     CreateBookRequest,
     PatchBookRequest,
@@ -34,6 +36,7 @@ from bookstore_api.application.books.get_book_details import (
     GetBookDetailsResult,
     GetBookDetailsService,
 )
+from bookstore_api.application.books.list_books import ListBooksQuery, ListBooksService
 from bookstore_api.application.books.update_book import UpdateBookService
 
 router = APIRouter(prefix="/api/v1/books", tags=["books"], route_class=DishkaSyncRoute)
@@ -63,6 +66,34 @@ def create_book(
         ) from exc
 
     return BookResponse(id=result.book_id)
+
+
+@router.get(
+    "",
+    response_model=BookListResponse,
+    status_code=status.HTTP_200_OK,
+    summary="List matching books",
+    description=(
+        "Returns the first matching books ordered by ISBN ascending. Optional title and author "
+        "filters use case- and accent-sensitive literal substrings and combine with AND. "
+        "Trims outer filter whitespace; blank or oversized filters, unknown query parameters, "
+        "and invalid limits return 422. Percent and underscore characters are literal. "
+        "The limit defaults to 20 and must be between 1 and 100. Empty collections return 200. "
+        "has_more reports whether additional matching books exist; cursor navigation is not yet "
+        "available. Returns no collection ETag; retrieve a book individually before conditional writes."
+    ),
+)
+def list_books(
+    params: Annotated[BookListParams, Query()],
+    service: FromDishka[ListBooksService],
+) -> BookListResponse:
+    result = service.execute(
+        ListBooksQuery(title=params.title, author=params.author, limit=params.limit)
+    )
+    return BookListResponse(
+        items=[_book_response(item) for item in result.items],
+        has_more=result.has_more,
+    )
 
 
 @router.get(

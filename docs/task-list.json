@@ -23,10 +23,10 @@
   ],
   "current_focus": {
     "lesson": 4,
-    "component": 4,
-    "title": "Delete books and define resource lifecycle",
-    "task_ids": ["BOOK-016"],
-    "next_action": "BOOK-016 is complete. Next proposed component is BOOK-017: agree on collection representation, filters, ordering, and query bounds before implementation.",
+    "component": 5,
+    "title": "List books with agreed filters",
+    "task_ids": ["BOOK-017"],
+    "next_action": "BOOK-017 code is implemented. Prompt the user to write tests as a separate step before adding tests or advancing to BOOK-018.",
     "previous_component_verification": {
       "task_ids": ["BOOK-011", "BOOK-012", "BOOK-013", "BOOK-014", "BOOK-015"],
       "fresh_checks_run_for_this_inventory": true,
@@ -237,7 +237,9 @@
       "title": "List books with agreed filters",
       "description": "Define a collection representation, supported filters, stable ordering, and bounded queries using existing architectural boundaries.",
       "status": "todo",
-      "scope": "proposed",
+      "scope": "accepted",
+      "implementation_state": "Collection query/result records, service, repository port, fake and SQLAlchemy adapters, HTTP schemas and route, and Dishka registration are implemented. The agreed contract lives in route metadata and schemas. Tests have not been written or run for this component; test writing is a separate user-prompted step after implementation.",
+      "remaining_work": ["Write application and HTTP tests after prompting the user.", "Write and run live MySQL listing tests for filter semantics, ordering, and bounds.", "Run quality checks and record final verification evidence."],
       "acceptance_criteria": ["Agree on filters and ordering.", "Test empty collections, matching results, and invalid query parameters."]
     },
     {

@@ -11,6 +11,7 @@ from pydantic import (
 )
 from pydantic.json_schema import SkipJsonSchema
 
+from bookstore_api.application.books.list_books import MAX_LIST_LIMIT
 from bookstore_api.domain.books.book import MAX_AUTHOR_LENGTH, MAX_TITLE_LENGTH
 
 type BookTitle = Annotated[
@@ -67,6 +68,18 @@ class PatchBookRequest(BaseModel):
         return self
 
 
+class BookListParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: BookTitle | None = Field(
+        default=None, description="Case-sensitive literal substring of the title."
+    )
+    author: BookAuthor | None = Field(
+        default=None, description="Case-sensitive literal substring of the author."
+    )
+    limit: int = Field(default=20, ge=1, le=MAX_LIST_LIMIT)
+
+
 class BookResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -80,6 +93,15 @@ class BookDetailsResponse(BaseModel):
     isbn: str
     title: BookTitle
     author: BookAuthor
+
+
+class BookListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[BookDetailsResponse]
+    has_more: bool = Field(
+        description="Whether more matching books exist beyond the returned limit."
+    )
 
 
 class BookNotFoundDetail(BaseModel):

@@ -51,7 +51,7 @@ adding a wrapper solely to hide `yield`.
 | Location | Responsibility |
 |---|---|
 | [`domain/books/`](../src/bookstore_api/domain/books) | `Book`, `ISBN`, and local invariants |
-| [`application/books/`](../src/bookstore_api/application/books) | Create, read, and update use cases, commands/results, and repository port |
+| [`application/books/`](../src/bookstore_api/application/books) | Create, read, list, update, and delete use cases, commands/results, and repository port |
 | [`application/unit_of_work.py`](../src/bookstore_api/application/unit_of_work.py) | Transaction boundary port |
 | [`infrastructure/persistence/`](../src/bookstore_api/infrastructure/persistence) | SQLAlchemy models, mapping, engine/session factories, repository, and unit of work |
 | [`api/books/`](../src/bookstore_api/api/books) | Book HTTP schemas and Dishka-enabled router |
@@ -133,6 +133,23 @@ The unit of work translates MySQL duplicate-key failures for `uq_books_isbn` int
 `BookAlreadyExistsError`; unrelated integrity errors propagate. Loaded books are reconstructed
 objects, so changing one does not automatically update its ORM model. The update use case
 explicitly calls the repository's `update` operation before committing.
+
+## Collection reads
+
+`ListBooksService` validates query bounds and normalizes optional text filters before opening
+a unit of work. The repository applies literal substring filters, combines them with AND,
+orders by unique ISBN, and limits rows in SQL. The MySQL adapter explicitly selects a binary
+collation for case- and accent-sensitive matching and escapes LIKE wildcard characters.
+The fake uses Python substring matching with the same intended semantics; agreement with
+MySQL still requires persistence tests.
+
+The service requests one extra row to determine whether more matches exist, maps the returned
+books to application read results, and omits the extra row from its result. Reads never commit.
+The HTTP adapter constructs an explicit collection representation without exposing versions
+or ORM models. Route metadata and schemas own the detailed endpoint contract.
+
+This bounds fetched rows, not database scan cost: substring filters may scan the catalog.
+Cursor navigation belongs to BOOK-018. No schema change is required for this read path.
 
 ## Conditional update flow
 

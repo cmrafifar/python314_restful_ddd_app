@@ -10,6 +10,20 @@ class BookRepository(Protocol):
 
     def get_by_isbn(self, isbn: ISBN) -> Book | None: ...
 
+    def list_books(
+        self,
+        *,
+        title: str | None,
+        author: str | None,
+        limit: int,
+    ) -> list[Book]:
+        """Return matching books ordered by ISBN ascending, up to limit.
+
+        Combine case-sensitive literal substring filters with AND.
+        None disables a filter. Do not commit.
+        """
+        ...
+
     def add(self, book: Book) -> None: ...
 
     def update(self, book: Book) -> int:

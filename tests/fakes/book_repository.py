@@ -20,6 +20,21 @@ class FakeBookRepository(BookRepository):
             None,
         )
 
+    def list_books(
+        self,
+        *,
+        title: str | None,
+        author: str | None,
+        limit: int,
+    ) -> list[Book]:
+        matching = (
+            book
+            for book in self.books.values()
+            if (title is None or title in book.title) and (author is None or author in book.author)
+        )
+        ordered = sorted(matching, key=lambda book: book.isbn.value)
+        return deepcopy(ordered[:limit])
+
     def add(self, book: Book) -> None:
         self.books[book.id] = deepcopy(book)
 

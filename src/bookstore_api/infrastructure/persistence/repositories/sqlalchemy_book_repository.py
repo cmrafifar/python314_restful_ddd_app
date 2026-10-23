@@ -34,6 +34,27 @@ class SqlAlchemyBookRepository(BookRepository):
 
         return BookMapper.to_domain(model)
 
+    def list_books(
+        self,
+        *,
+        title: str | None,
+        author: str | None,
+        limit: int,
+    ) -> list[Book]:
+        statement = select(BookModel)
+        # Binary collation keeps matching case- and accent-sensitive, like the fake adapter.
+        if title is not None:
+            statement = statement.where(
+                BookModel.title.collate("utf8mb4_bin").contains(title, autoescape=True)
+            )
+        if author is not None:
+            statement = statement.where(
+                BookModel.author.collate("utf8mb4_bin").contains(author, autoescape=True)
+            )
+
+        statement = statement.order_by(BookModel.isbn.asc()).limit(limit)
+        return [BookMapper.to_domain(model) for model in self._session.scalars(statement)]
+
     def add(self, book: Book) -> None:
         model = BookMapper.to_model(book)
 
