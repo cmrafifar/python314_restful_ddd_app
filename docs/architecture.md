@@ -167,6 +167,20 @@ HTTP tests use fakes. The independent-connection MySQL regression tests live in
 [`test_sqlalchemy_book_updates.py`](../tests/integration/persistence/test_sqlalchemy_book_updates.py); their presence
 does not assert a live run. See [testing](testing.md) for execution and verification limits.
 
+## Conditional repository deletion
+
+The repository's `delete(book)` operation executes a single SQL DELETE with predicates for
+both `book.id` and `book.version`, using the session's existing transactional connection.
+It does not reload an ORM model or commit. An affected-row count other than one raises
+`BookVersionConflictError`, covering a concurrent update or deletion after the service's read.
+The application still checks client expectations against the loaded entity before deletion.
+
+This explicit statement supplies its own version predicate; it does not use ORM automatic
+version checking or synchronize loaded ORM instances. Each use case owns a short-lived unit
+of work, and callers should use repository reads rather than retained ORM instances after deletion.
+The caller must commit; leaving the unit of work without committing rolls back the deletion.
+This adapter capability does not imply the DELETE HTTP endpoint is complete.
+
 ## Change guidance
 
 Keep invariants on entities and value objects; keep orchestration in use cases. Add ports for needed external capabilities, not for every class. Do not add generic repositories, event buses, CQRS infrastructure, or additional bounded contexts without a concrete requirement.

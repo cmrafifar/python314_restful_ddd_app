@@ -19,7 +19,7 @@ class ErrorResponse(BaseModel):
 
 ETAG_HEADERS: dict[str, object] = {
     "ETag": {
-        "description": "Strong validator for this book representation. Send it unchanged in If-Match.",
+        "description": "Strong validator for this entity representation. Send it unchanged in If-Match.",
         "schema": {"type": "string"},
         "example": '"book-5d23d9a6-4198-4fca-ae01-f962d7b71401-v1"',
     },
@@ -42,13 +42,13 @@ CONDITIONAL_UPDATE_RESPONSES: dict[int | str, dict[str, object]] = {
     },
     status.HTTP_412_PRECONDITION_FAILED: {
         "model": ErrorResponse,
-        "description": "No strong tag matched, or another writer changed/deleted the book before flush. Fetch and reconcile before retrying.",
+        "description": "No strong tag matched, or another writer changed/deleted before flush. Fetch and reconcile before retrying.",
         "content": {
             "application/json": {
                 "example": {
                     "detail": {
                         "code": "precondition_failed",
-                        "message": "The book changed; retrieve it before updating",
+                        "message": "The entity changed; retrieve it before updating",
                     }
                 }
             }
@@ -56,13 +56,13 @@ CONDITIONAL_UPDATE_RESPONSES: dict[int | str, dict[str, object]] = {
     },
     status.HTTP_428_PRECONDITION_REQUIRED: {
         "model": ErrorResponse,
-        "description": "If-Match is required. Retrieve the book and send its ETag.",
+        "description": "If-Match is required. Retrieve the entity and send its ETag.",
         "content": {
             "application/json": {
                 "example": {
                     "detail": {
                         "code": "precondition_required",
-                        "message": "Supply If-Match from the book's ETag",
+                        "message": "Supply If-Match from the entity's ETag",
                     }
                 }
             }

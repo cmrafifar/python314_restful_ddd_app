@@ -30,3 +30,9 @@ class FakeBookRepository(BookRepository):
         book.version += 1
         self.books[book.id] = deepcopy(book)
         return book.version
+
+    def delete(self, book: Book) -> None:
+        stored = self.books.get(book.id)
+        if stored is None or stored.version != book.version:
+            raise BookVersionConflictError("The book changed or was deleted")
+        del self.books[book.id]

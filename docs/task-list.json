@@ -26,7 +26,7 @@
     "component": 4,
     "title": "Delete books and define resource lifecycle",
     "task_ids": ["BOOK-016"],
-    "next_action": "The learner authorized continuing to BOOK-016. Agree on deletion lifecycle and HTTP semantics before implementation. Proposed for discussion: hard deletion with required If-Match, 204 on success, 404 for missing or already deleted books, existing 400/428/412 precondition errors, and ISBN reuse after deletion.",
+    "next_action": "Continue BOOK-016 one piece at a time with the learner handcoding. The deletion contract is agreed. Next implement FakeBookRepository.delete, then application tests, DI registration, HTTP routing/error translation and tests, documentation, and final quality checks.",
     "previous_component_verification": {
       "task_ids": ["BOOK-011", "BOOK-012", "BOOK-013", "BOOK-014", "BOOK-015"],
       "fresh_checks_run_for_this_inventory": true,
@@ -205,7 +205,15 @@
       "description": "Agree on deletion semantics, repeated deletion, missing resources, and concurrency preconditions before adding the domain/application/HTTP behavior needed.",
       "status": "todo",
       "scope": "accepted",
-      "implementation_state": "The learner authorized starting this component. Deletion contract agreement is pending; no deletion behavior has been implemented.",
+      "implementation_state": "Contract agreed: hard deletion with required If-Match, 204 success, 404 for missing or already deleted books, existing 400/428/412 precondition errors, and ISBN reuse. Command, service, port, and conditional SQL DELETE adapter exist. The service checks client expectations; the adapter deletes atomically by ID and version. Five MySQL deletion tests cover deletion/ISBN reuse, missing rows, rollback, concurrent updates, and concurrent deletion. The latest ./scripts/test_integration.py run passed all 55 integration tests. HTTP wiring and application coverage remain unfinished.",
+      "remaining_work": [
+        "Implement version-aware deletion in FakeBookRepository.",
+        "Test service success and rejection paths, including no commit on failure.",
+        "Register DeleteBookService with Dishka.",
+        "Register the DELETE route with 204 and translate missing/version errors into 404/412.",
+        "Test the agreed HTTP contract and document it in OpenAPI and project documentation.",
+        "Run final pytest, MySQL, Ruff, formatting, BasedPyright, and whitespace checks."
+      ],
       "acceptance_criteria": ["Agree on lifecycle and HTTP contract.", "Implement and test the agreed slice."],
       "depends_on": ["BOOK-015"]
     },

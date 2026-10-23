@@ -20,12 +20,14 @@ from bookstore_api.api.books.schemas import (
 from bookstore_api.api.responses import CONDITIONAL_UPDATE_RESPONSES
 from bookstore_api.application.books.commands import (
     CreateBookCommand,
+    DeleteBookCommand,
     UpdateBookCommand,
 )
 from bookstore_api.application.books.create_book import (
     BookAlreadyExistsError,
     CreateBookService,
 )
+from bookstore_api.application.books.delete_book import DeleteBookService
 from bookstore_api.application.books.errors import BookVersionConflictError
 from bookstore_api.application.books.get_book_details import (
     BookNotFoundError,
@@ -131,6 +133,39 @@ def patch_book(
     result = _update_book(book_id, request.title, request.author, if_match, service)
     response.headers["ETag"] = book_etag(book_id, result.version)
     return _book_response(result)
+
+
+@router.delete(
+    "/{book_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={**CONDITIONAL_UPDATE_RESPONSES, **BOOK_NOT_FOUND_RESPONSES},
+    summary="delete book",
+    description=("Requires If-Match"),
+)
+def delete_book(
+    book_id: UUID,
+    service: FromDishka[DeleteBookService],
+    if_match: Annotated[list[str] | None, Header(description=IF_MATCH_DESCRIPTION)] = None,
+) -> None:
+    versions = parse_if_match(book_id, if_match)
+
+    try:
+        service.execute(DeleteBookCommand(book_id, expected_versions=versions))
+
+    except BookNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "book_not_found", "message": "Book not found"},
+        ) from exc
+
+    except BookVersionConflictError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_412_PRECONDITION_FAILED,
+            detail={
+                "code": "precondition_failed",
+                "message": "The book changed; retrieve it before deleting",
+            },
+        ) from exc
 
 
 def _update_book(

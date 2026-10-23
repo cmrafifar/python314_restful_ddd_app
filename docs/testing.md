@@ -16,6 +16,7 @@ Read when adding tests or validating behavior. Use pytest files named `test_*.py
 | [`tests/integration/api/test_books_api.py`](../tests/integration/api/test_books_api.py) | Create-book route, configured service with fake units of work, validation, and engine cleanup without a database |
 | [`tests/integration/api/test_book_updates.py`](../tests/integration/api/test_book_updates.py) | PUT/PATCH, text limits, ETag/If-Match, and OpenAPI contracts with fake persistence |
 | [`tests/integration/persistence/test_sqlalchemy_book_updates.py`](../tests/integration/persistence/test_sqlalchemy_book_updates.py) | MySQL version predicate with competing independent connections, unchanged-write version increments, and rollback after update flush |
+| [`tests/integration/persistence/test_sqlalchemy_book_deletes.py`](../tests/integration/persistence/test_sqlalchemy_book_deletes.py) | Conditional deletion, ISBN reuse, missing-row rejection, rollback, and competing MySQL updates/deletions |
 | [`tests/fakes/`](../tests/fakes) | Reusable in-memory adapters |
 
 HTTP tests replace dependencies through `create_app(provider_overrides=[provider])`. Register

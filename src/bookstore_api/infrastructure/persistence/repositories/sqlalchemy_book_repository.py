@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.exc import StaleDataError
 
@@ -53,3 +53,12 @@ class SqlAlchemyBookRepository(BookRepository):
         except StaleDataError as exc:
             raise BookVersionConflictError("The book changed or was deleted") from exc
         return model.version
+
+    def delete(self, book: Book) -> None:
+        statement = delete(BookModel).where(
+            BookModel.id == str(book.id), BookModel.version == book.version
+        )
+        # Execute on the unit of work's connection without another ORM lookup or a commit.
+        result = self._session.connection().execute(statement)
+        if result.rowcount != 1:
+            raise BookVersionConflictError("The book changed or was deleted")

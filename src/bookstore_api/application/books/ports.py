@@ -19,3 +19,11 @@ class BookRepository(Protocol):
         The caller must still commit the unit of work.
         """
         ...
+
+    def delete(self, book: Book) -> None:
+        """Delete only if the stored version equals book.version.
+
+        Raise BookVersionConflictError on a stale version or a concurrent deletion.
+        The caller must still commit the unit of work.
+        """
+        ...
