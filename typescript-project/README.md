@@ -118,3 +118,9 @@ creation, and empty DELETE responses do not. Express's automatic weak ETag gener
 
 See [architecture and contract decisions](docs/architecture.md) for boundaries and deliberate
 differences from Python. Route decorators and DTOs own detailed endpoint contracts.
+
+See [API conventions](docs/api-conventions.md) for HTTP behavior and
+[technology decisions](docs/decisions.md) for stack choices, tradeoffs, and upgrade policy.
+
+For developer-specific Codex approval rules and check commands, see
+[Codex how-tos](docs/ai/codex.md). This is human reference material, separate from agent instructions.

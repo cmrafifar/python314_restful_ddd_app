@@ -1,5 +1,8 @@
 # Architecture and contract decisions
 
+See [API conventions](api-conventions.md) for the HTTP contract and
+[technology decisions](decisions.md) for the rationale behind the selected tools and patterns.
+
 ## Ownership and dependencies
 
 This is a small modular monolith. `src/books/domain` owns Book, ISBN, and business rules.
