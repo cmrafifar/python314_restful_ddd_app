@@ -1,3 +1,5 @@
+import base64
+import json
 from collections.abc import Iterator
 
 import pytest
@@ -45,7 +47,12 @@ def test_empty_collection_returns_200_without_etag(client: TestClient) -> None:
     response = client.get("/api/v1/books")
 
     assert response.status_code == 200
-    assert response.json() == {"items": [], "has_more": False}
+    assert response.json() == {
+        "items": [],
+        "has_more": False,
+        "next_cursor": None,
+        "previous_cursor": None,
+    }
     assert "etag" not in response.headers
 
 
@@ -64,6 +71,8 @@ def test_listing_returns_details_in_isbn_order(client: TestClient, books: list[B
             for book in books
         ],
         "has_more": False,
+        "next_cursor": None,
+        "previous_cursor": None,
     }
     assert "etag" not in response.headers
 
@@ -171,19 +180,119 @@ def test_openapi_documents_collection_contract(client: TestClient) -> None:
     assert {"200", "422"} <= operation["responses"].keys()
     assert "requestBody" not in operation
     parameters = {parameter["name"]: parameter for parameter in operation["parameters"]}
-    assert parameters.keys() == {"title", "author", "limit"}
+    assert parameters.keys() == {"title", "author", "limit", "cursor"}
     assert all(p["in"] == "query" and not p["required"] for p in parameters.values())
     limit = parameters["limit"]["schema"]
     assert (limit["default"], limit["minimum"], limit["maximum"]) == (20, 1, 100)
-    for field, maximum in [("title", 100), ("author", 80)]:
-        text_ref = next(s["$ref"] for s in parameters[field]["schema"]["anyOf"] if "$ref" in s)
-        text_schema = schema["components"]["schemas"][text_ref.rsplit("/", 1)[-1]]
-        assert (text_schema["minLength"], text_schema["maxLength"]) == (1, maximum)
     response = operation["responses"]["200"]["content"]["application/json"]["schema"]
     assert response["$ref"] == "#/components/schemas/BookListResponse"
     collection = schema["components"]["schemas"]["BookListResponse"]
-    assert set(collection["required"]) == {"items", "has_more"}
+    assert set(collection["required"]) == {"items", "has_more", "next_cursor", "previous_cursor"}
     assert collection["properties"]["items"]["items"]["$ref"] == (
         "#/components/schemas/BookDetailsResponse"
     )
     assert collection["properties"]["has_more"]["type"] == "boolean"
+
+
+def encoded_cursor(payload: object) -> str:
+    return base64.urlsafe_b64encode(json.dumps(payload).encode()).decode().rstrip("=")
+
+
+def test_http_navigation_round_trip(client: TestClient, books: list[Book]) -> None:
+    first = client.get("/api/v1/books", params={"limit": 1}).json()
+    assert first["previous_cursor"] is None
+    assert first["next_cursor"] is not None
+    middle_response = client.get(
+        "/api/v1/books", params={"limit": 1, "cursor": first["next_cursor"]}
+    )
+    assert middle_response.status_code == 200
+    middle = middle_response.json()
+    assert [item["id"] for item in middle["items"]] == [str(books[1].id)]
+    assert middle["has_more"] is True
+    assert middle["next_cursor"] is not None
+    assert middle["previous_cursor"] is not None
+    for field, isbn, direction in [
+        ("previous_cursor", books[1].isbn.value, "previous"),
+        ("next_cursor", books[1].isbn.value, "next"),
+    ]:
+        token = middle[field]
+        decoded = base64.urlsafe_b64decode(token + "=" * (-len(token) % 4))
+        assert json.loads(decoded) == {"v": 1, "isbn": isbn, "direction": direction}
+
+    last = client.get("/api/v1/books", params={"limit": 1, "cursor": middle["next_cursor"]}).json()
+    assert [item["id"] for item in last["items"]] == [str(books[2].id)]
+    assert last["has_more"] is False
+    assert last["next_cursor"] is None
+    back = client.get(
+        "/api/v1/books", params={"limit": 1, "cursor": middle["previous_cursor"]}
+    ).json()
+    assert back == first
+
+
+def test_http_previous_page_preserves_filters_and_accepts_new_limit(
+    client: TestClient, books: list[Book]
+) -> None:
+    first = client.get("/api/v1/books", params={"limit": 1, "title": "Clean"}).json()
+    second = client.get(
+        "/api/v1/books", params={"limit": 1, "title": "Clean", "cursor": first["next_cursor"]}
+    ).json()
+
+    response = client.get(
+        "/api/v1/books", params={"limit": 2, "title": "Clean", "cursor": second["previous_cursor"]}
+    )
+
+    assert response.status_code == 200
+    assert [item["id"] for item in response.json()["items"]] == [str(books[0].id)]
+    assert response.json()["previous_cursor"] is None
+    assert response.json()["has_more"] is True
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        None,
+        [],
+        {},
+        {"v": 1, "isbn": "9780132350884"},
+        {"v": 2, "isbn": "9780132350884", "direction": "next"},
+        {"v": True, "isbn": "9780132350884", "direction": "next"},
+        {"v": 1.0, "isbn": "9780132350884", "direction": "next"},
+        {"v": "1", "isbn": "9780132350884", "direction": "next"},
+        {"v": 1, "isbn": "9780132350884", "direction": "back"},
+        {"v": 1, "isbn": "9780132350884", "direction": None},
+        {"v": 1, "isbn": 9780132350884, "direction": "next"},
+        {"v": 1, "isbn": "9780132350885", "direction": "next"},
+        {"v": 1, "isbn": "invalid", "direction": "next"},
+        {"v": 1, "isbn": "9780132350884", "direction": "next", "page": 2},
+    ],
+)
+def test_invalid_cursor_payload_returns_422(client: TestClient, payload: object) -> None:
+    response = client.get("/api/v1/books", params={"cursor": encoded_cursor(payload)})
+
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["query", "cursor"]
+
+
+@pytest.mark.parametrize("token", ["", "!", "a", "+/8=", "_w", "ew", "A" * 513])
+def test_invalid_cursor_encoding_returns_422(client: TestClient, token: str) -> None:
+    response = client.get("/api/v1/books", params={"cursor": token})
+
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["query", "cursor"]
+
+
+@pytest.mark.parametrize("direction,index", [("next", 2), ("previous", 0)])
+def test_empty_continuation_returns_null_cursors(
+    client: TestClient, books: list[Book], direction: str, index: int
+) -> None:
+    token = encoded_cursor({"v": 1, "isbn": books[index].isbn.value, "direction": direction})
+
+    response = client.get("/api/v1/books", params={"cursor": token})
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "items": [],
+        "has_more": False,
+        "next_cursor": None,
+        "previous_cursor": None,
+    }

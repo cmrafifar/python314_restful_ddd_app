@@ -143,13 +143,31 @@ collation for case- and accent-sensitive matching and escapes LIKE wildcard char
 The fake uses Python substring matching with the same intended semantics; agreement with
 MySQL still requires persistence tests.
 
-The service requests one extra row to determine whether more matches exist, maps the returned
-books to application read results, and omits the extra row from its result. Reads never commit.
-The HTTP adapter constructs an explicit collection representation without exposing versions
-or ORM models. Route metadata and schemas own the detailed endpoint contract.
+The service requests one extra row to determine whether more matches exist in the requested
+direction, then removes that row. For backward navigation the repository seeks below the
+boundary in descending ISBN order; the service reverses the retained rows so all responses
+remain ascending. For forward navigation the repository seeks above the boundary. The stored
+ISBN boundary does not require its original row to exist.
+
+For a nonempty continuation, the repository checks whether matching rows exist on the opposite
+side using SQL `EXISTS` with the same filters. The service uses lookahead and this existence
+result to supply nullable navigation positions; it does not assume the incoming cursor proves
+that an earlier or later page still exists. Empty pages supply no navigation positions.
+The existing `has_more` flag always describes availability in forward display order.
+
+Application pagination records in `application/books/pagination.py` carry an ISBN and direction
+without transport encoding. The HTTP codec in `api/books/pagination.py` translates these records
+to versioned JSON encoded with unpadded URL-safe Base64. Pydantic query validation rejects
+invalid cursors before the service opens a unit of work. Clients retain the current filters
+between requests; the cursor does not bind or embed those filters. No snapshot spans requests.
+
+Reads never commit. The HTTP adapter constructs an explicit collection representation without
+exposing book versions or ORM models. Route metadata and schemas own the endpoint contract.
 
 This bounds fetched rows, not database scan cost: substring filters may scan the catalog.
-Cursor navigation belongs to BOOK-018. No schema change is required for this read path.
+ISBN uniqueness supplies the seek index; no schema change is required for this read path.
+The accepted [bidirectional keyset pagination decision](decisions/0003-bidirectional-keyset-pagination.md)
+records the rationale and limitations.
 
 ## Conditional update flow
 

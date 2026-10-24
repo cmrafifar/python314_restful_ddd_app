@@ -9,6 +9,7 @@ from bookstore_api.api.books.conditional_requests import (
     book_etag,
     parse_if_match,
 )
+from bookstore_api.api.books.pagination import decode_cursor, encode_cursor
 from bookstore_api.api.books.responses import BOOK_NOT_FOUND_RESPONSES, BOOK_READ_RESPONSES
 from bookstore_api.api.books.schemas import (
     BookDetailsResponse,
@@ -79,8 +80,16 @@ def create_book(
         "Trims outer filter whitespace; blank or oversized filters, unknown query parameters, "
         "and invalid limits return 422. Percent and underscore characters are literal. "
         "The limit defaults to 20 and must be between 1 and 100. Empty collections return 200. "
-        "has_more reports whether additional matching books exist; cursor navigation is not yet "
-        "available. Returns no collection ETag; retrieve a book individually before conditional writes."
+        "Use the opaque next_cursor or previous_cursor as the cursor query parameter to navigate; "
+        "unavailable cursors are null. Preserve title and author filters across requests; changing "
+        "filters starts a new traversal without a cursor. Limits may change between requests. "
+        "Cursors encode version 1, an ISBN boundary, and direction using unpadded URL-safe Base64. "
+        "Malformed cursors, unsupported versions, and invalid boundaries or directions return 422. "
+        "Items always use ISBN ascending order. has_more means next_cursor is available, including "
+        "when navigating backward. Empty pages return null cursors and has_more=false; restart "
+        "without a cursor if collection changes leave a continuation empty. Deleted boundary books "
+        "do not invalidate cursors. Navigation does not provide a snapshot across requests. "
+        "Returns no collection ETag; retrieve a book individually before conditional writes."
     ),
 )
 def list_books(
@@ -88,11 +97,18 @@ def list_books(
     service: FromDishka[ListBooksService],
 ) -> BookListResponse:
     result = service.execute(
-        ListBooksQuery(title=params.title, author=params.author, limit=params.limit)
+        ListBooksQuery(
+            title=params.title,
+            author=params.author,
+            limit=params.limit,
+            cursor=decode_cursor(params.cursor) if params.cursor is not None else None,
+        )
     )
     return BookListResponse(
         items=[_book_response(item) for item in result.items],
         has_more=result.has_more,
+        next_cursor=encode_cursor(result.next_cursor),
+        previous_cursor=encode_cursor(result.previous_cursor),
     )
 
 

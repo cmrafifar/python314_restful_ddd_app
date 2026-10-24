@@ -81,5 +81,11 @@ also carries no ETag. Document applicable response headers in each operation's O
 - Test statuses, response shapes, headers, and error translation through public routes.
   Use persistence integration tests for database guarantees that fakes cannot prove.
 
-Agree on pagination, authentication, rate limiting, and versioning policies when concrete
-requirements need them. Their conventions are not defined here yet.
+Collection navigation uses opaque, versioned keyset cursors with next and previous navigation.
+Clients preserve filters between requests and start a new traversal when filters change.
+Navigation is not a snapshot across requests. See the
+[pagination decision](decisions/0003-bidirectional-keyset-pagination.md) for rationale;
+route metadata and schemas define cursor validation and response fields.
+
+Agree on authentication, rate limiting, and API versioning policies when concrete requirements
+need them. Their conventions are not defined here yet.

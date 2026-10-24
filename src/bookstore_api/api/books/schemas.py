@@ -11,6 +11,7 @@ from pydantic import (
 )
 from pydantic.json_schema import SkipJsonSchema
 
+from bookstore_api.api.books.pagination import MAX_CURSOR_LENGTH, decode_cursor
 from bookstore_api.application.books.list_books import MAX_LIST_LIMIT
 from bookstore_api.domain.books.book import MAX_AUTHOR_LENGTH, MAX_TITLE_LENGTH
 
@@ -78,6 +79,19 @@ class BookListParams(BaseModel):
         default=None, description="Case-sensitive literal substring of the author."
     )
     limit: int = Field(default=20, ge=1, le=MAX_LIST_LIMIT)
+    cursor: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=MAX_CURSOR_LENGTH,
+        description="Opaque next or previous cursor. Omit for the first page; preserve filters.",
+    )
+
+    @field_validator("cursor")
+    @classmethod
+    def validate_cursor(cls, value: str | None) -> str | None:
+        if value is not None:
+            decode_cursor(value)
+        return value
 
 
 class BookResponse(BaseModel):
@@ -100,7 +114,13 @@ class BookListResponse(BaseModel):
 
     items: list[BookDetailsResponse]
     has_more: bool = Field(
-        description="Whether more matching books exist beyond the returned limit."
+        description="Whether a next page exists in ISBN ascending order, even when navigating back."
+    )
+    next_cursor: str | None = Field(
+        description="Opaque next-page cursor, or null when unavailable."
+    )
+    previous_cursor: str | None = Field(
+        description="Opaque previous-page cursor, or null when unavailable."
     )
 
 

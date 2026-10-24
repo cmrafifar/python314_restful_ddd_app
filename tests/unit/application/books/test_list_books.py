@@ -1,6 +1,7 @@
 import pytest
 
 from bookstore_api.application.books.list_books import ListBooksQuery, ListBooksService
+from bookstore_api.application.books.pagination import BookPageCursor
 from bookstore_api.application.unit_of_work import UnitOfWork
 from bookstore_api.domain.books.book import Book
 from bookstore_api.domain.books.isbn import ISBN
@@ -165,4 +166,84 @@ def test_list_books_accepts_filter_length_boundaries_after_trimming() -> None:
 
     assert [item.book_id for item in result.items] == [book.id]
     assert result.has_more is False
+    assert uow.committed is False
+
+
+@pytest.mark.parametrize(
+    ("boundary", "direction", "limit", "indexes", "has_previous", "has_next"),
+    [
+        (0, "next", 1, [1], True, True),
+        (1, "next", 1, [2], True, False),
+        (2, "previous", 1, [1], True, True),
+        (1, "previous", 1, [0], False, True),
+        (2, "previous", 2, [0, 1], False, True),
+        (0, "next", 100, [1, 2], True, False),
+        (0, "previous", 1, [], False, False),
+        (2, "next", 1, [], False, False),
+    ],
+)
+def test_navigation_boundaries_and_availability(
+    catalog: tuple[ListBooksService, FakeUnitOfWork, list[Book]],
+    boundary: int,
+    direction: str,
+    limit: int,
+    indexes: list[int],
+    has_previous: bool,
+    has_next: bool,
+) -> None:
+    service, uow, books = catalog
+    cursor = BookPageCursor(books[boundary].isbn, "next" if direction == "next" else "previous")
+
+    result = service.execute(ListBooksQuery(cursor=cursor, limit=limit))
+
+    assert [item.book_id for item in result.items] == [books[i].id for i in indexes]
+    assert result.has_more is has_next
+    assert result.next_cursor == (
+        BookPageCursor(books[indexes[-1]].isbn, "next") if has_next else None
+    )
+    assert result.previous_cursor == (
+        BookPageCursor(books[indexes[0]].isbn, "previous") if has_previous else None
+    )
+    assert uow.committed is False
+
+
+def test_pages_round_trip_with_changed_limit(
+    catalog: tuple[ListBooksService, FakeUnitOfWork, list[Book]],
+) -> None:
+    service, uow, books = catalog
+    first = service.execute(ListBooksQuery(limit=2))
+    assert first.previous_cursor is None
+    assert first.next_cursor is not None
+    last = service.execute(ListBooksQuery(cursor=first.next_cursor, limit=1))
+    assert last.next_cursor is None
+    assert last.previous_cursor is not None
+
+    back = service.execute(ListBooksQuery(cursor=last.previous_cursor, limit=2))
+
+    assert back.items == first.items
+    assert back.previous_cursor is None
+    assert back.next_cursor == first.next_cursor
+    assert [item.book_id for item in last.items] == [books[2].id]
+    assert uow.committed is False
+
+
+def test_opposite_navigation_uses_current_filters(
+    catalog: tuple[ListBooksService, FakeUnitOfWork, list[Book]],
+) -> None:
+    service, uow, books = catalog
+
+    backward = service.execute(
+        ListBooksQuery(title="Clean", limit=1, cursor=BookPageCursor(books[2].isbn, "previous"))
+    )
+    forward = service.execute(
+        ListBooksQuery(author="Ada", limit=1, cursor=BookPageCursor(books[1].isbn, "next"))
+    )
+
+    assert [item.book_id for item in backward.items] == [books[1].id]
+    assert backward.previous_cursor is not None
+    assert backward.next_cursor is None
+    assert backward.has_more is False
+    assert [item.book_id for item in forward.items] == [books[2].id]
+    assert forward.previous_cursor is None
+    assert forward.next_cursor is None
     assert uow.committed is False

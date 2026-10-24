@@ -23,10 +23,10 @@
   ],
   "current_focus": {
     "lesson": 4,
-    "component": 5,
-    "title": "List books with agreed filters",
-    "task_ids": ["BOOK-017"],
-    "next_action": "BOOK-017 is complete with application, HTTP, and live MySQL verification. Await explicit authorization before advancing to BOOK-018.",
+    "component": 6,
+    "title": "Add bidirectional keyset pagination",
+    "task_ids": ["BOOK-018"],
+    "next_action": "BOOK-018 is complete with application, HTTP, and live MySQL verification. Await explicit authorization before advancing to BOOK-019.",
     "previous_component_verification": {
       "task_ids": ["BOOK-011", "BOOK-012", "BOOK-013", "BOOK-014", "BOOK-015"],
       "fresh_checks_run_for_this_inventory": true,
@@ -261,10 +261,34 @@
       "id": "BOOK-018",
       "area": "lesson-4-component-6",
       "title": "Add keyset pagination",
-      "description": "Choose a deterministic ordering and cursor contract, then explore pagination behavior under concurrent inserts and updates.",
-      "status": "todo",
-      "scope": "proposed",
-      "acceptance_criteria": ["Document cursor semantics and limits.", "Test ordering ties, page boundaries, and invalid cursors."],
+      "description": "Add next and previous navigation with versioned opaque cursors and fixed ISBN ordering, then verify behavior under collection changes.",
+      "status": "complete",
+      "scope": "accepted",
+      "implementation_state": "Bidirectional ISBN keyset pagination is implemented across application records/service, repository port, SQLAlchemy and fake adapters, and HTTP schemas/router. A bounded HTTP codec handles versioned JSON encoded as unpadded URL-safe Base64. Previous-page queries seek in descending order; retained results return ascending. Lookahead and a filtered opposite-side EXISTS query determine navigation availability. Invalid cursors return standard 422 validation errors; reads do not commit. Route metadata, schemas, architecture, API conventions, and decision 0003 describe implemented behavior.",
+      "remaining_work": [],
+      "acceptance_criteria": [
+        "Implement the accepted cursor and navigation decision; publish the endpoint contract through route metadata and schemas.",
+        "Prove stable ISBN ordering, page boundaries, round trips, and invalid cursor rejection.",
+        "Verify cursor availability, bounded queries, deleted anchors, and collection changes with live MySQL.",
+        "Keep filters and limits compatible and reads free of commits; record quality checks and verification limits."
+      ],
+      "evidence": [
+        "docs/decisions/0003-bidirectional-keyset-pagination.md",
+        "src/bookstore_api/application/books/pagination.py",
+        "src/bookstore_api/application/books/list_books.py",
+        "src/bookstore_api/api/books/pagination.py",
+        "src/bookstore_api/api/books/router.py",
+        "src/bookstore_api/infrastructure/persistence/repositories/sqlalchemy_book_repository.py",
+        "tests/unit/application/books/test_list_books.py",
+        "tests/integration/api/test_book_listing.py",
+        "tests/integration/persistence/test_sqlalchemy_book_listing.py"
+      ],
+      "verification": {
+        "date": "2026-10-23",
+        "local": "uv run pytest: 206 passed, 58 MySQL cases skipped. uv run ruff check ., uv run ruff format --check ., and uv run basedpyright passed with no errors or warnings. Whitespace and task JSON checks passed.",
+        "mysql": "./scripts/test_integration.sh: 172 integration tests passed, including all 58 live MySQL persistence cases and 44 listing cases. Alembic upgrade head and alembic check passed with no schema drift. Independent connections verified page round trips, deleted anchors, inserts on either side of a boundary, filter-changing edits, and removal of earlier rows.",
+        "limits": "HTTP tests use fake persistence. MySQL results prove seek and transaction behavior on the isolated test database, not production performance. Existing substring filters may scan candidates. Pagination does not provide a snapshot across requests; empty continuations return null cursors and clients may restart. No new migration or deployment was needed. No staging or commit was performed; previously staged documentation was preserved."
+      },
       "depends_on": ["BOOK-017"]
     },
     {

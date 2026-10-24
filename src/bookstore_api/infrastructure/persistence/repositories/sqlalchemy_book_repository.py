@@ -1,10 +1,11 @@
 from uuid import UUID
 
-from sqlalchemy import delete, select
+from sqlalchemy import Select, delete, select
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.exc import StaleDataError
 
 from bookstore_api.application.books.errors import BookVersionConflictError
+from bookstore_api.application.books.pagination import BookPageCursor
 from bookstore_api.application.books.ports import BookRepository
 from bookstore_api.domain.books.book import Book
 from bookstore_api.domain.books.isbn import ISBN
@@ -40,7 +41,24 @@ class SqlAlchemyBookRepository(BookRepository):
         title: str | None,
         author: str | None,
         limit: int,
+        cursor: BookPageCursor | None = None,
     ) -> list[Book]:
+        statement = self._matching_books(title=title, author=author, cursor=cursor)
+        order = (
+            BookModel.isbn.desc()
+            if cursor is not None and cursor.direction == "previous"
+            else BookModel.isbn.asc()
+        )
+        statement = statement.order_by(order).limit(limit)
+        return [BookMapper.to_domain(model) for model in self._session.scalars(statement)]
+
+    def has_books(self, *, title: str | None, author: str | None, cursor: BookPageCursor) -> bool:
+        matching = self._matching_books(title=title, author=author, cursor=cursor)
+        return bool(self._session.scalar(select(matching.exists())))
+
+    def _matching_books(
+        self, *, title: str | None, author: str | None, cursor: BookPageCursor | None
+    ) -> Select[BookModel]:
         statement = select(BookModel)
         # Binary collation keeps matching case- and accent-sensitive, like the fake adapter.
         if title is not None:
@@ -52,8 +70,12 @@ class SqlAlchemyBookRepository(BookRepository):
                 BookModel.author.collate("utf8mb4_bin").contains(author, autoescape=True)
             )
 
-        statement = statement.order_by(BookModel.isbn.asc()).limit(limit)
-        return [BookMapper.to_domain(model) for model in self._session.scalars(statement)]
+        if cursor is not None:
+            if cursor.direction == "next":
+                statement = statement.where(BookModel.isbn > cursor.isbn.value)
+            else:
+                statement = statement.where(BookModel.isbn < cursor.isbn.value)
+        return statement
 
     def add(self, book: Book) -> None:
         model = BookMapper.to_model(book)
