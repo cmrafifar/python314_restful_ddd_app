@@ -4,9 +4,9 @@
 **Edition:** 2026-10-20  
 **Primary implementation:** Python 3.14  
 **Portable curriculum:** Can be reimplemented in TypeScript or another ecosystem  
-**Current Python progress:** Lesson 3, Component 7 covered; knowledge check passed. Lesson 3 is pending final discussion/closure. Lesson 4 has **not** started.
+**Project progress:** See [the task list](docs/task-list.json) for completed work, current focus, remaining tasks, and verification evidence.
 
-> This document defines the **course**, not a complete transcript or exact snapshot of the repository. An agent replicating the tutorial from scratch should start at Lesson 1. An agent resuming the current Python project should inspect the actual repository and use the latest handoff/conversation as the source of truth for applied code, especially the recent adoption of **Dishka**. The October 18 handoff predates that change.
+> This document defines the **course**, not a complete transcript or exact snapshot of the repository. An agent replicating the tutorial from scratch should start at Lesson 1. An agent resuming the current Python project should use [the task list](docs/task-list.json) for progress and inspect the actual repository to verify implementation state.
 
 ---
 
@@ -43,7 +43,7 @@ By the end of the course, the learner should be able to:
 
 ## 2. Course structure and syllabus
 
-**Planned scope: 12 lessons total.** Lessons 1–3 were developed interactively; Lessons 4–12 are the agreed **proposed** organization of the remaining roadmap, not previously completed material. Component breakdowns after Lesson 3 are a suggested teaching plan, adjustable without changing the learning objectives.
+**Planned scope: 12 lessons total.** The syllabus describes learning goals, not completion status or authorization to implement every topic. Component breakdowns after Lesson 3 are a suggested teaching plan, adjustable without changing the learning objectives. Consult [the task list](docs/task-list.json) for accepted work and current progress.
 
 **At the start of every lesson:** suggest a concise, descriptive Git branch name such as `feature/bookstore-http-api`. At the end of a completed component or lesson: provide a professional **Conventional Commit** subject and explanatory body. Never claim that unobserved tests or commits succeeded.
 
@@ -426,7 +426,7 @@ Each language edition should maintain:
 - `README.md` — how to run the concrete implementation.
 - A machine-readable dependency manifest and lockfile.
 - Project-specific `architecture.md` or ADRs for major deviations/decisions.
-- A progress/handoff note recording completed components, unresolved issues, and actual repository state.
+- A task list recording completed components, unresolved issues, and verification evidence; this project's canonical progress file is [docs/task-list.json](docs/task-list.json).
 - Tests and migration instructions.
 
 ### Suggested agent startup procedure
@@ -440,34 +440,26 @@ If beginning from scratch:
 
 If resuming existing code:
 
-1. Read `tutorial.md`, the latest handoff, and the repository's current source/tests/config.
-2. Reconcile any stale handoff details with the **observed repository** and the learner's latest direct decisions.
+1. Read this course specification, [the task list](docs/task-list.json), and the repository's current source/tests/config.
+2. Reconcile task-list claims with the **observed repository** and the learner's latest direct decisions.
 3. State the current lesson/component, unresolved questions, and notable unverified assumptions.
 4. Continue the **current** component only; obtain approval before advancing.
 
 ---
 
-## 8. Progress snapshot and source-of-truth rules
+## 8. Source-of-truth rules
 
-As of this document's edition:
-
-- Lessons **1–2**: covered in the Python tutorial.
-- Lesson **3, Components 1–7**: material covered; Component 7 knowledge check answered correctly. The learner has recently improved the implementation using **Dishka**.
-- Lesson **3 closure**: **not yet explicitly approved**. Do not treat passing the knowledge check as permission to begin Lesson 4.
-- Lessons **4–12**: proposed syllabus, not started.
-- Exact local source code, passing tests, Git state, and final Dishka provider definitions: **not verified by this document**.
+[docs/task-list.json](docs/task-list.json) is the single progress record for this project. Maintain completed tasks, current focus, remaining work, and verification evidence there. Do not duplicate progress snapshots or next-task instructions in this curriculum. Completion status does not imply a fresh test run; consult recorded verification limits and the current checkout.
 
 **Authority order when there is a conflict:**
 
 1. Learner's newest explicit instruction or architectural decision.
 2. Current checked-out repository source and tests (for actual code state).
-3. Latest project handoff / ADRs.
+3. The task list for progress; ADRs and project documentation for established decisions.
 4. This curriculum (for course structure and standards).
 5. Historical examples, which may be superseded.
 
-**Historical handoff:** `bookstore-api-handoff-2026-10-18.md` contains detailed earlier implementation and teaching decisions, but its stated stopping point at Lesson 3, Component 5 is **outdated** relative to the current conversation.
-
-**Next action for the current Python project:** Stay at the end of Lesson 3, Component 7; invite remaining implementation or DI questions. Ask explicitly before starting **Lesson 4, Component 1**.
+Historical handoffs provide background only. Use the task list and current source/tests to determine where to resume.
 
 ---
 

@@ -1,10 +1,11 @@
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import Select, delete, select
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.exc import StaleDataError
 
 from bookstore_api.application.books.errors import BookVersionConflictError
+from bookstore_api.application.books.pagination import BookPageCursor
 from bookstore_api.application.books.ports import BookRepository
 from bookstore_api.domain.books.book import Book
 from bookstore_api.domain.books.isbn import ISBN
@@ -34,6 +35,48 @@ class SqlAlchemyBookRepository(BookRepository):
 
         return BookMapper.to_domain(model)
 
+    def list_books(
+        self,
+        *,
+        title: str | None,
+        author: str | None,
+        limit: int,
+        cursor: BookPageCursor | None = None,
+    ) -> list[Book]:
+        statement = self._matching_books(title=title, author=author, cursor=cursor)
+        order = (
+            BookModel.isbn.desc()
+            if cursor is not None and cursor.direction == "previous"
+            else BookModel.isbn.asc()
+        )
+        statement = statement.order_by(order).limit(limit)
+        return [BookMapper.to_domain(model) for model in self._session.scalars(statement)]
+
+    def has_books(self, *, title: str | None, author: str | None, cursor: BookPageCursor) -> bool:
+        matching = self._matching_books(title=title, author=author, cursor=cursor)
+        return bool(self._session.scalar(select(matching.exists())))
+
+    def _matching_books(
+        self, *, title: str | None, author: str | None, cursor: BookPageCursor | None
+    ) -> Select[BookModel]:
+        statement = select(BookModel)
+        # Binary collation keeps matching case- and accent-sensitive, like the fake adapter.
+        if title is not None:
+            statement = statement.where(
+                BookModel.title.collate("utf8mb4_bin").contains(title, autoescape=True)
+            )
+        if author is not None:
+            statement = statement.where(
+                BookModel.author.collate("utf8mb4_bin").contains(author, autoescape=True)
+            )
+
+        if cursor is not None:
+            if cursor.direction == "next":
+                statement = statement.where(BookModel.isbn > cursor.isbn.value)
+            else:
+                statement = statement.where(BookModel.isbn < cursor.isbn.value)
+        return statement
+
     def add(self, book: Book) -> None:
         model = BookMapper.to_model(book)
 
@@ -53,3 +96,12 @@ class SqlAlchemyBookRepository(BookRepository):
         except StaleDataError as exc:
             raise BookVersionConflictError("The book changed or was deleted") from exc
         return model.version
+
+    def delete(self, book: Book) -> None:
+        statement = delete(BookModel).where(
+            BookModel.id == str(book.id), BookModel.version == book.version
+        )
+        # Execute on the unit of work's connection without another ORM lookup or a commit.
+        result = self._session.connection().execute(statement)
+        if result.rowcount != 1:
+            raise BookVersionConflictError("The book changed or was deleted")

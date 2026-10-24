@@ -94,7 +94,7 @@ def test_create_book_uses_configured_service() -> None:
     assert create_uow.committed
     assert duplicate.status_code == 409
     assert duplicate.json() == {
-        "detail": "Book with ISBN 9780132350884 already exists",
+        "detail": "A resource with the supplied ISBN already exists",
     }
     assert not duplicate_uow.committed
     assert len(repository.books) == 1
@@ -168,7 +168,7 @@ def test_get_book_returns_404_with_stable_error_code() -> None:
     assert response.json() == {
         "detail": {
             "code": "book_not_found",
-            "message": "Book not found",
+            "message": "Resource not found",
         },
     }
     service.execute.assert_called_once_with(book_id)

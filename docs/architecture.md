@@ -51,7 +51,7 @@ adding a wrapper solely to hide `yield`.
 | Location | Responsibility |
 |---|---|
 | [`domain/books/`](../src/bookstore_api/domain/books) | `Book`, `ISBN`, and local invariants |
-| [`application/books/`](../src/bookstore_api/application/books) | Create, read, and update use cases, commands/results, and repository port |
+| [`application/books/`](../src/bookstore_api/application/books) | Create, read, list, update, and delete use cases, commands/results, and repository port |
 | [`application/unit_of_work.py`](../src/bookstore_api/application/unit_of_work.py) | Transaction boundary port |
 | [`infrastructure/persistence/`](../src/bookstore_api/infrastructure/persistence) | SQLAlchemy models, mapping, engine/session factories, repository, and unit of work |
 | [`api/books/`](../src/bookstore_api/api/books) | Book HTTP schemas and Dishka-enabled router |
@@ -134,6 +134,41 @@ The unit of work translates MySQL duplicate-key failures for `uq_books_isbn` int
 objects, so changing one does not automatically update its ORM model. The update use case
 explicitly calls the repository's `update` operation before committing.
 
+## Collection reads
+
+`ListBooksService` validates query bounds and normalizes optional text filters before opening
+a unit of work. The repository applies literal substring filters, combines them with AND,
+orders by unique ISBN, and limits rows in SQL. The MySQL adapter explicitly selects a binary
+collation for case- and accent-sensitive matching and escapes LIKE wildcard characters.
+The fake uses Python substring matching with the same intended semantics; agreement with
+MySQL still requires persistence tests.
+
+The service requests one extra row to determine whether more matches exist in the requested
+direction, then removes that row. For backward navigation the repository seeks below the
+boundary in descending ISBN order; the service reverses the retained rows so all responses
+remain ascending. For forward navigation the repository seeks above the boundary. The stored
+ISBN boundary does not require its original row to exist.
+
+For a nonempty continuation, the repository checks whether matching rows exist on the opposite
+side using SQL `EXISTS` with the same filters. The service uses lookahead and this existence
+result to supply nullable navigation positions; it does not assume the incoming cursor proves
+that an earlier or later page still exists. Empty pages supply no navigation positions.
+The existing `has_more` flag always describes availability in forward display order.
+
+Application pagination records in `application/books/pagination.py` carry an ISBN and direction
+without transport encoding. The HTTP codec in `api/books/pagination.py` translates these records
+to versioned JSON encoded with unpadded URL-safe Base64. Pydantic query validation rejects
+invalid cursors before the service opens a unit of work. Clients retain the current filters
+between requests; the cursor does not bind or embed those filters. No snapshot spans requests.
+
+Reads never commit. The HTTP adapter constructs an explicit collection representation without
+exposing book versions or ORM models. Route metadata and schemas own the endpoint contract.
+
+This bounds fetched rows, not database scan cost: substring filters may scan the catalog.
+ISBN uniqueness supplies the seek index; no schema change is required for this read path.
+The accepted [bidirectional keyset pagination decision](decisions/0003-bidirectional-keyset-pagination.md)
+records the rationale and limitations.
+
 ## Conditional update flow
 
 The HTTP adapter translates `If-Match` into an `UpdateBookCommand`: a set of acceptable versions,
@@ -166,6 +201,22 @@ but competing writes after the application's read can still produce a conflict.
 HTTP tests use fakes. The independent-connection MySQL regression tests live in
 [`test_sqlalchemy_book_updates.py`](../tests/integration/persistence/test_sqlalchemy_book_updates.py); their presence
 does not assert a live run. See [testing](testing.md) for execution and verification limits.
+
+## Conditional repository deletion
+
+The repository's `delete(book)` operation executes a single SQL DELETE with predicates for
+both `book.id` and `book.version`, using the session's existing transactional connection.
+It does not reload an ORM model or commit. An affected-row count other than one raises
+`BookVersionConflictError`, covering a concurrent update or deletion after the service's read.
+The application still checks client expectations against the loaded entity before deletion.
+
+This explicit statement supplies its own version predicate; it does not use ORM automatic
+version checking or synchronize loaded ORM instances. Each use case owns a short-lived unit
+of work, and callers should use repository reads rather than retained ORM instances after deletion.
+The caller must commit; leaving the unit of work without committing rolls back the deletion.
+The DELETE endpoint translates HTTP preconditions into application version expectations.
+Its route metadata defines the response contract; [API conventions](api-conventions.md#conditional-writes)
+defines the shared precondition policy.
 
 ## Change guidance
 
