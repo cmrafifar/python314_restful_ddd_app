@@ -1,0 +1,9 @@
+packages:
+  - '.'
+allowBuilds:
+  '@nestjs/core': true
+  '@prisma/engines': true
+  prisma: true
+  '@scarf/scarf': false
+minimumReleaseAgeExclude:
+  - '@nestjs/swagger@12.0.4'

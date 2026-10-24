@@ -1,0 +1,19 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Book {
+  id      String @id @db.Uuid
+  isbn    String @unique(map: "uq_books_isbn") @db.VarChar(13)
+  title   String @db.VarChar(100)
+  author  String @db.VarChar(80)
+  version Int    @default(1)
+
+  @@map("books")
+}
