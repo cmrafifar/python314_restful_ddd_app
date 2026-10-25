@@ -1,8 +1,8 @@
-import { Book, MAX_AUTHOR_LENGTH, MAX_TITLE_LENGTH, normalizeText } from '../domain/book.js';
-import { InvalidBookError } from '../domain/errors.js';
-import { ISBN } from '../domain/isbn.js';
-import type { BookCursor, BookSelection, BookTransactions } from './book-repository.js';
-import { BookAlreadyExistsError, BookNotFoundError, BookVersionConflictError } from './errors.js';
+import {Book, MAX_AUTHOR_LENGTH, MAX_TITLE_LENGTH, normalizeText} from '../domain/book.js';
+import {InvalidBookError} from '../domain/errors.js';
+import {ISBN} from '../domain/isbn.js';
+import type {BookCursor, BookSelection, BookTransactions} from './book-repository.js';
+import {BookAlreadyExistsError, BookNotFoundError, BookVersionConflictError} from './errors.js';
 
 export type ExpectedVersions = ReadonlySet<number> | null;
 export const MAX_LIST_LIMIT = 100;
@@ -15,7 +15,8 @@ export interface BookPage {
 }
 
 export class BookCatalog {
-  constructor(private readonly transactions: BookTransactions) {}
+  constructor(private readonly transactions: BookTransactions) {
+  }
 
   async create(command: {
     readonly isbn: string;
@@ -74,30 +75,30 @@ export class BookCatalog {
     const selection: BookSelection = {
       ...(query.title === undefined
         ? {}
-        : { title: normalizeText(query.title, 'Title', MAX_TITLE_LENGTH) }),
+        : {title: normalizeText(query.title, 'Title', MAX_TITLE_LENGTH)}),
       ...(query.author === undefined
         ? {}
-        : { author: normalizeText(query.author, 'Author', MAX_AUTHOR_LENGTH) }),
-      ...(query.cursor === undefined ? {} : { cursor: query.cursor }),
+        : {author: normalizeText(query.author, 'Author', MAX_AUTHOR_LENGTH)}),
+      ...(query.cursor === undefined ? {} : {cursor: query.cursor}),
     };
     return this.transactions.run(async (books) => {
       const rows = await books.list(selection, query.limit + 1);
       const extra = rows.length > query.limit;
       const items = rows.slice(0, query.limit);
       if (items.length === 0) {
-        return { items, hasMore: false, nextCursor: null, previousCursor: null };
+        return {items, hasMore: false, nextCursor: null, previousCursor: null};
       }
       const backward = query.cursor?.direction === 'previous';
       if (backward) items.reverse();
       const first = items.at(0);
       const last = items.at(-1);
       if (!first || !last) throw new Error('Nonempty page required');
-      const next: BookCursor = { isbn: last.isbn, direction: 'next' };
-      const previous: BookCursor = { isbn: first.isbn, direction: 'previous' };
-      const hasNext = backward ? await books.hasBooks({ ...selection, cursor: next }) : extra;
+      const next: BookCursor = {isbn: last.isbn, direction: 'next'};
+      const previous: BookCursor = {isbn: first.isbn, direction: 'previous'};
+      const hasNext = backward ? await books.hasBooks({...selection, cursor: next}) : extra;
       const hasPrevious = backward
         ? extra
-        : query.cursor !== undefined && (await books.hasBooks({ ...selection, cursor: previous }));
+        : query.cursor !== undefined && (await books.hasBooks({...selection, cursor: previous}));
       return {
         items,
         hasMore: hasNext,
