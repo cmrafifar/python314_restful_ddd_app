@@ -2,7 +2,8 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from bookstore_api.application.books.commands import CreateBookCommand
-from bookstore_api.application.unit_of_work import UnitOfWorkFactory
+from bookstore_api.application.books.ports import BookRepository
+from bookstore_api.application.books.transactions import BookTransactions
 from bookstore_api.domain.books.book import Book
 from bookstore_api.domain.books.isbn import ISBN
 
@@ -19,15 +20,15 @@ class CreateBookResult:
 class CreateBookService:
     def __init__(
         self,
-        uow_factory: UnitOfWorkFactory,
+        transactions: BookTransactions,
     ) -> None:
-        self._uow_factory = uow_factory
+        self._transactions = transactions
 
     def execute(self, command: CreateBookCommand) -> CreateBookResult:
         isbn = ISBN(command.isbn)
 
-        with self._uow_factory() as uow:
-            existing = uow.books.get_by_isbn(isbn)
+        def work(repository: BookRepository) -> CreateBookResult:
+            existing = repository.get_by_isbn(isbn)
 
             if existing is not None:
                 raise BookAlreadyExistsError(f"Book with ISBN {isbn.value} already exists")
@@ -38,7 +39,8 @@ class CreateBookService:
                 author=command.author,
             )
 
-            uow.books.add(book)
-            uow.commit()
+            repository.add(book)
 
             return CreateBookResult(book_id=book.id)
+
+        return self._transactions.run(work)

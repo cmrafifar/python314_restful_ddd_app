@@ -68,13 +68,13 @@ length constants prevent the limits from drifting; domain code does not depend o
 
 ### Creation and uniqueness
 
-[`CreateBookService`](../../src/bookstore_api/application/books/create_book.py) checks ISBN uniqueness through its repository. A duplicate causes `BookAlreadyExistsError`, with no add or commit requested by the service.
+[`CreateBookService`](../../src/bookstore_api/application/books/create_book.py) checks ISBN uniqueness through its repository. A duplicate causes `BookAlreadyExistsError`, without adding a book; the callback fails and the transaction rolls back.
 
-On success, the service adds one book, commits, and returns its ID. Title/author failures occur inside the unit-of-work context; ISBN validation occurs before entering it.
+On success, the callback adds one book and returns its ID; the transaction runner commits before returning the result to the caller. Title/author failures occur inside the callback; ISBN validation occurs before opening the transaction.
 
 The [`books` table](../../src/bookstore_api/infrastructure/persistence/models/book.py) also has a
 unique ISBN constraint. A concurrent duplicate can pass the preliminary lookup and fail at
-commit. The unit of work translates MySQL duplicate-key errors for `uq_books_isbn` into
+commit. The transaction runner translates MySQL duplicate-key errors for `uq_books_isbn` into
 `BookAlreadyExistsError`; unrelated integrity failures propagate.
 
 ### Deletion and ISBN reuse
@@ -85,8 +85,8 @@ record's identity. Missing records are rejected rather than treated as successfu
 
 The application checks the caller's version expectations against the loaded book. The
 repository deletes only when the stored version still matches that book, preventing a
-concurrent update or deletion from being silently accepted. The unit of work must commit
-the deletion; leaving without commit rolls it back. No domain mutation is needed to delete
+concurrent update or deletion from being silently accepted. Successful callback completion
+commits the deletion; a callback or commit failure rolls it back. No domain mutation is needed to delete
 a record. HTTP preconditions and statuses belong to the adapter; see [API conventions](../api-conventions.md).
 
 ## Examples and evidence
@@ -94,7 +94,7 @@ a record. HTTP preconditions and statuses belong to the adapter; see [API conven
 - [Book entity tests](../../tests/unit/domain/books/test_book.py): creation, title rejection, and rename behavior.
 - [ISBN tests](../../tests/unit/domain/books/test_isbn.py): accepted values, checksum, length, equality, and immutability.
 - [Use-case tests](../../tests/unit/application/books/test_create_book.py): successful creation and duplicate rejection with fakes.
-- [Collaboration specifications](../../tests/specs/application/books/test_create_book_spec.py): repository and commit interactions.
+- [Collaboration specifications](../../tests/specs/application/books/test_create_book_spec.py): repository interactions within the transaction callback.
 
 Implemented rules above are not a claim that every boundary case already has test coverage.
 

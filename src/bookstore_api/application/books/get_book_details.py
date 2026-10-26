@@ -2,7 +2,8 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from bookstore_api.application.books.errors import BookNotFoundError
-from bookstore_api.application.unit_of_work import UnitOfWorkFactory
+from bookstore_api.application.books.ports import BookRepository
+from bookstore_api.application.books.transactions import BookTransactions
 from bookstore_api.domain.books.isbn import ISBN
 
 __all__ = ["BookNotFoundError", "GetBookDetailsResult", "GetBookDetailsService"]
@@ -18,12 +19,12 @@ class GetBookDetailsResult:
 
 
 class GetBookDetailsService:
-    def __init__(self, uow_factory: UnitOfWorkFactory) -> None:
-        self._uow_factory = uow_factory
+    def __init__(self, transactions: BookTransactions) -> None:
+        self._transactions = transactions
 
     def execute(self, book_id: UUID) -> GetBookDetailsResult:
-        with self._uow_factory() as uow:
-            book = uow.books.get_by_id(book_id)
+        def work(repository: BookRepository) -> GetBookDetailsResult:
+            book = repository.get_by_id(book_id)
             if book is None:
                 raise BookNotFoundError(f"Book with id {book_id} not found")
             return GetBookDetailsResult(
@@ -33,3 +34,5 @@ class GetBookDetailsService:
                 author=book.author,
                 version=book.version,
             )
+
+        return self._transactions.run(work)

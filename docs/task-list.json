@@ -60,11 +60,11 @@
       "id": "BOOK-003",
       "area": "application",
       "title": "Create books through an application use case",
-      "description": "Coordinate book creation through a repository port and explicit Unit of Work, rejecting duplicate ISBNs and committing successful creation.",
+      "description": "Coordinate book creation through repository and callback transaction ports, rejecting duplicate ISBNs and committing successful creation.",
       "status": "complete",
       "scope": "accepted",
-      "acceptance_criteria": ["Creation and duplicate behavior have isolated tests.", "Application code owns the commit decision."],
-      "evidence": ["src/bookstore_api/application/books/create_book.py", "src/bookstore_api/application/books/ports.py", "src/bookstore_api/application/unit_of_work.py", "tests/specs/application/books/test_create_book_spec.py"]
+      "acceptance_criteria": ["Creation and duplicate behavior have isolated tests.", "Application code defines the atomic callback; successful completion commits."],
+      "evidence": ["src/bookstore_api/application/books/create_book.py", "src/bookstore_api/application/books/ports.py", "src/bookstore_api/application/books/transactions.py", "tests/specs/application/books/test_create_book_spec.py"]
     },
     {
       "id": "BOOK-004",
@@ -79,12 +79,12 @@
     {
       "id": "BOOK-005",
       "area": "persistence",
-      "title": "Manage transaction and session lifetimes explicitly",
-      "description": "Create a session and repositories per Unit of Work, commit explicitly, roll back unfinished transactions, and close sessions on exit.",
+      "title": "Manage transaction and session lifetimes through callbacks",
+      "description": "Create a session and repository per callback, commit on success, roll back on failure, and close the session automatically.",
       "status": "complete",
       "scope": "accepted",
-      "acceptance_criteria": ["Unit of Work owns session cleanup.", "Tests describe commit visibility and rollback behavior."],
-      "evidence": ["src/bookstore_api/infrastructure/persistence/sqlalchemy_unit_of_work.py", "tests/integration/persistence/test_sqlalchemy_unit_of_work.py"]
+      "acceptance_criteria": ["The transaction runner owns session cleanup.", "Tests describe commit visibility and rollback behavior."],
+      "evidence": ["src/bookstore_api/infrastructure/persistence/sqlalchemy_book_transactions.py", "tests/integration/persistence/test_sqlalchemy_unit_of_work.py"]
     },
     {
       "id": "BOOK-006",

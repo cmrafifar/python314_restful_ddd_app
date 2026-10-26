@@ -104,7 +104,9 @@ query cost. Direct numbered page jumps and total page counts are outside this sc
 1. `application/books/pagination.py` defines the typed boundary and direction;
    `application/books/list_books.py` coordinates navigation without transport encoding.
 2. `application/books/ports.py` declares bounded seek and existence capabilities.
-   Reads never commit.
+   The original implementation did not commit reads. [Decision 0004](0004-callback-transactions.md)
+now completes read callbacks with the shared commit-on-success lifecycle; collection reads still
+issue no writes.
 3. `infrastructure/persistence/repositories/sqlalchemy_book_repository.py` and
    `tests/fakes/book_repository.py` implement the same navigation semantics.
 4. `api/books/pagination.py` encodes and strictly decodes cursors.

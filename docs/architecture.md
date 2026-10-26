@@ -14,7 +14,7 @@ Composition root -> concrete adapters and application
 
 - Domain code may use the Python standard library and other domain code. It must not import application, infrastructure, FastAPI, Pydantic, SQLAlchemy, or Alembic.
 - Application code may use domain code and its own ports. It must not import concrete adapters or framework types.
-- Ports describe capabilities the application needs, using domain or application types. Application owns the existing repository and unit-of-work ports.
+- Ports describe capabilities the application needs, using domain or application types. Application owns the existing repository and transaction ports.
 - Adapters translate between external representations and core types. ORM models and HTTP schemas must not become domain entities.
 - The composition root may depend on all layers to wire concrete implementations. Business decisions do not belong there.
 
@@ -52,8 +52,8 @@ adding a wrapper solely to hide `yield`.
 |---|---|
 | [`domain/books/`](../src/bookstore_api/domain/books) | `Book`, `ISBN`, and local invariants |
 | [`application/books/`](../src/bookstore_api/application/books) | Create, read, list, update, and delete use cases, commands/results, and repository port |
-| [`application/unit_of_work.py`](../src/bookstore_api/application/unit_of_work.py) | Transaction boundary port |
-| [`infrastructure/persistence/`](../src/bookstore_api/infrastructure/persistence) | SQLAlchemy models, mapping, engine/session factories, repository, and unit of work |
+| [`application/books/transactions.py`](../src/bookstore_api/application/books/transactions.py) | Transaction boundary port |
+| [`infrastructure/persistence/`](../src/bookstore_api/infrastructure/persistence) | SQLAlchemy models, mapping, engine/session factories, repository, and transaction runner |
 | [`api/books/`](../src/bookstore_api/api/books) | Book HTTP schemas and Dishka-enabled router |
 | [`di/`](../src/bookstore_api/di) | Composition root: container construction and modular dependency providers |
 | [`main.py`](../src/bookstore_api/main.py) | FastAPI factory, container integration and shutdown, and health route |
@@ -67,17 +67,17 @@ The implemented repository is in `infrastructure/persistence/repositories/sqlalc
 `POST /api/v1/books` calls the use case through the HTTP adapter. `create_app` builds a Dishka
 container from settings and the registered providers. The router uses `DishkaSyncRoute` and
 requests `FromDishka[CreateBookService]`. Dishka constructs the service from its constructor
-annotations, supplying a unit-of-work factory that creates a fresh `SqlAlchemyUnitOfWork` for
-each execution. Dependencies are created lazily. Creating the engine does not connect to MySQL;
+annotations, supplying a shared `BookTransactions` adapter that creates a fresh SQLAlchemy
+session and transaction for each callback. Dependencies are created lazily. Creating the engine does not connect to MySQL;
 a health-only request does not construct it. Application shutdown closes the container and
 disposes any engine it created.
 
 1. A caller supplies a `CreateBookCommand` to `CreateBookService.execute`.
-2. The service constructs `ISBN`, validating its representation and checksum before opening a unit of work.
-3. The injected factory supplies a unit of work. Its repository checks for the ISBN.
+2. The service constructs `ISBN`, validating its representation and checksum before opening a transaction.
+3. The service passes a callback to `BookTransactions.run`; its repository checks for the ISBN.
 4. An existing ISBN causes `BookAlreadyExistsError`; the service does not add or commit a book.
 5. `Book.create` generates a UUID and validates title and author.
-6. The repository adds the book, the service calls `commit`, and the result returns its UUID.
+6. The repository adds the book. Callback success commits the transaction before returning its UUID.
 
 Sources: [service](../src/bookstore_api/application/books/create_book.py), [domain rules](domain/books.md), and [collaboration specifications](../tests/specs/application/books/test_create_book_spec.py).
 
@@ -95,19 +95,21 @@ owns assembly; application and domain code must not import Dishka or resolve ser
 Providers group related registrations, similar to Laravel service providers:
 
 - [`PersistenceProvider`](../src/bookstore_api/di/providers/persistence.py) owns engine creation
-  and disposal, session-factory construction, and the `UnitOfWorkFactory` binding.
+  and disposal, session-factory construction, and the `BookTransactions` binding.
 - [`BooksProvider`](../src/bookstore_api/di/providers/books.py) registers `CreateBookService`, `GetBookDetailsService`, and `UpdateBookService`
   using constructor autowiring. Add book use cases here; add other cohesive providers when
   additional features require them. Register each provider explicitly in `create_container`.
 
-Settings, engine, session factory, unit-of-work factory, and stateless book services use
-`Scope.APP`. A fresh unit of work and session belong to each use-case execution, not the HTTP
-request scope. The unit of work still constructs its repositories so they share its session.
-Dishka does not control commits or construct domain entities from request data.
+Settings, engine, session factory, and transaction runner use `Scope.APP`. Book services use
+the scopes registered in `BooksProvider`. Each `BookTransactions.run` call creates a fresh
+session and transaction, independent
+of HTTP request scope. The runner constructs the repository with that session and passes it to
+the callback. Shared services retain no active session or per-call state. Dishka does not control
+commits or construct domain entities from request data.
 
-`application/unit_of_work.py` names the factory contract with
-`type UnitOfWorkFactory = Callable[[], UnitOfWork]`. Services and providers use that same alias;
-follow the [type annotation convention](coding-guidelines.md#type-annotations) for complex contracts.
+`application/books/transactions.py` defines the structural `BookTransactions` protocol and
+`type BookTransactionWork[T] = Callable[[BookRepository], T]`. The callback receives a repository
+and returns a typed application result. The runner returns that result only after commit succeeds.
 
 HTTP routers use `DishkaSyncRoute` with direct `FromDishka[ServiceType]` parameters. Avoid custom
 dependency annotation aliases and per-service lookups through `Request` or `app.state`.
@@ -122,22 +124,27 @@ See [decision 0002](decisions/0002-dishka-dependency-injection.md) for alternati
 
 ## Transactions and persistence
 
-- The application service decides when the use case succeeds and explicitly requests a commit.
-- `SqlAlchemyUnitOfWork` owns the session lifecycle, creates the repository on entry, and closes the session on exit.
-- On exit, any remaining transaction is rolled back. Successful context exit alone does not commit.
-- Repository methods do not commit. `add` creates an ORM model through `BookMapper` and adds it to the session.
+- The application service chooses the atomic work by passing a callback to `BookTransactions.run`.
+- `SqlAlchemyBookTransactions` uses SQLAlchemy's `sessionmaker.begin()` context to create a
+  session, begin a transaction, commit on successful callback completion, roll back on failure,
+  and close the session. Commit failures also prevent the callback result from reaching the caller.
+- Repositories do not commit. `add` creates an ORM model through `BookMapper` and adds it to the session.
 - Mapping reconstructs domain objects using the persisted UUID. It must not generate a replacement identity.
 - A database unique constraint protects ISBN uniqueness. The preliminary application lookup alone cannot prevent concurrent duplicates.
 
-The unit of work translates MySQL duplicate-key failures for `uq_books_isbn` into
-`BookAlreadyExistsError`; unrelated integrity errors propagate. Loaded books are reconstructed
-objects, so changing one does not automatically update its ORM model. The update use case
-explicitly calls the repository's `update` operation before committing.
+The runner translates MySQL duplicate-key failures for `uq_books_isbn` into
+`BookAlreadyExistsError`, including failures during commit; unrelated integrity errors propagate.
+Loaded books are reconstructed objects, so changing one does not automatically update its ORM
+model. The update callback explicitly calls the repository's `update` operation.
+
+One callback represents one transaction, not a whole HTTP request. Do not retain its repository,
+return lazy database results, or make unrelated network calls within it. There are no implicit
+retries or ambient transactions. See [decision 0004](decisions/0004-callback-transactions.md).
 
 ## Collection reads
 
 `ListBooksService` validates query bounds and normalizes optional text filters before opening
-a unit of work. The repository applies literal substring filters, combines them with AND,
+a transaction. The repository applies literal substring filters, combines them with AND,
 orders by unique ISBN, and limits rows in SQL. The MySQL adapter explicitly selects a binary
 collation for case- and accent-sensitive matching and escapes LIKE wildcard characters.
 The fake uses Python substring matching with the same intended semantics; agreement with
@@ -158,10 +165,10 @@ The existing `has_more` flag always describes availability in forward display or
 Application pagination records in `application/books/pagination.py` carry an ISBN and direction
 without transport encoding. The HTTP codec in `api/books/pagination.py` translates these records
 to versioned JSON encoded with unpadded URL-safe Base64. Pydantic query validation rejects
-invalid cursors before the service opens a unit of work. Clients retain the current filters
+invalid cursors before the service opens a transaction. Clients retain the current filters
 between requests; the cursor does not bind or embed those filters. No snapshot spans requests.
 
-Reads never commit. The HTTP adapter constructs an explicit collection representation without
+Read callbacks use the same commit-on-success lifecycle but issue no writes. The HTTP adapter constructs an explicit collection representation without
 exposing book versions or ORM models. Route metadata and schemas own the endpoint contract.
 
 This bounds fetched rows, not database scan cost: substring filters may scan the catalog.
@@ -192,9 +199,8 @@ the race between reading a version and writing the changes. The earlier Python c
 alone cannot provide that guarantee. See SQLAlchemy's
 [version counter documentation](https://docs.sqlalchemy.org/en/20/orm/versioning.html).
 
-Flushing checks the write without committing it. The service commits only after `update`
-succeeds. On failure or an unfinished transaction, the unit of work rolls back and closes the
-session. Version checks cover these ORM writes; direct SQL and bulk writes must implement
+Flushing checks the write without committing it. The transaction runner commits only after the
+callback succeeds. On failure it rolls back and closes the session. Version checks cover these ORM writes; direct SQL and bulk writes must implement
 their own predicate and version increment. A wildcard bypasses the client's version check,
 but competing writes after the application's read can still produce a conflict.
 
@@ -205,15 +211,14 @@ does not assert a live run. See [testing](testing.md) for execution and verifica
 ## Conditional repository deletion
 
 The repository's `delete(book)` operation executes a single SQL DELETE with predicates for
-both `book.id` and `book.version`, using the session's existing transactional connection.
+both `book.id` and `book.version`, using the callback's existing transactional connection.
 It does not reload an ORM model or commit. An affected-row count other than one raises
 `BookVersionConflictError`, covering a concurrent update or deletion after the service's read.
 The application still checks client expectations against the loaded entity before deletion.
 
 This explicit statement supplies its own version predicate; it does not use ORM automatic
-version checking or synchronize loaded ORM instances. Each use case owns a short-lived unit
-of work, and callers should use repository reads rather than retained ORM instances after deletion.
-The caller must commit; leaving the unit of work without committing rolls back the deletion.
+version checking or synchronize loaded ORM instances. Each callback owns a short-lived transaction, and callers should use repository reads rather than retained ORM instances after deletion.
+Callback success commits the deletion; an exception rolls it back.
 The DELETE endpoint translates HTTP preconditions into application version expectations.
 Its route metadata defines the response contract; [API conventions](api-conventions.md#conditional-writes)
 defines the shared precondition policy.

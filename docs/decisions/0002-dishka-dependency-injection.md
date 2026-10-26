@@ -3,6 +3,9 @@
 Status: Accepted
 Date: 2026-10-20
 
+The transaction-lifecycle portion is superseded by [decision 0004](0004-callback-transactions.md).
+The Dishka integration and resource-lifetime decisions remain accepted.
+
 ## Context
 
 The create-book route used a custom dependency annotation alias and a request-based resolver

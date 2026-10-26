@@ -1,17 +1,18 @@
 from bookstore_api.application.books.commands import DeleteBookCommand
 from bookstore_api.application.books.errors import BookNotFoundError, BookVersionConflictError
-from bookstore_api.application.unit_of_work import UnitOfWorkFactory
+from bookstore_api.application.books.ports import BookRepository
+from bookstore_api.application.books.transactions import BookTransactions
 
 
 class DeleteBookService:
-    _uow_factory: UnitOfWorkFactory
+    _transactions: BookTransactions
 
-    def __init__(self, uow_factory: UnitOfWorkFactory) -> None:
-        self._uow_factory = uow_factory
+    def __init__(self, transactions: BookTransactions) -> None:
+        self._transactions = transactions
 
     def execute(self, command: DeleteBookCommand) -> int:
-        with self._uow_factory() as uow:
-            book = uow.books.get_by_id(command.book_id)
+        def work(repository: BookRepository) -> int:
+            book = repository.get_by_id(command.book_id)
             if book is None:
                 raise BookNotFoundError(f"Book with id {command.book_id} not found")
             if (
@@ -21,6 +22,7 @@ class DeleteBookService:
                 raise BookVersionConflictError("The book has changed; retrieve it before deleting")
 
             version = book.version
-            uow.books.delete(book)
-            uow.commit()
+            repository.delete(book)
             return version
+
+        return self._transactions.run(work)

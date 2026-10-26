@@ -41,7 +41,7 @@ class BookRepository(Protocol):
         """Save details only if the stored version equals book.version; return the new version.
 
         Raise BookVersionConflictError on a stale version or a concurrent deletion.
-        The caller must still commit the unit of work.
+        The surrounding transaction commits only after its callback succeeds.
         """
         ...
 
@@ -49,6 +49,6 @@ class BookRepository(Protocol):
         """Delete only if the stored version equals book.version.
 
         Raise BookVersionConflictError on a stale version or a concurrent deletion.
-        The caller must still commit the unit of work.
+        The surrounding transaction commits only after its callback succeeds.
         """
         ...

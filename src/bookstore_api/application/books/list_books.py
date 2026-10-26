@@ -2,7 +2,8 @@ from dataclasses import dataclass
 
 from bookstore_api.application.books.get_book_details import GetBookDetailsResult
 from bookstore_api.application.books.pagination import BookPageCursor
-from bookstore_api.application.unit_of_work import UnitOfWorkFactory
+from bookstore_api.application.books.ports import BookRepository
+from bookstore_api.application.books.transactions import BookTransactions
 from bookstore_api.domain.books.book import MAX_AUTHOR_LENGTH, MAX_TITLE_LENGTH
 
 MAX_LIST_LIMIT = 100
@@ -25,8 +26,8 @@ class ListBooksResult:
 
 
 class ListBooksService:
-    def __init__(self, uow_factory: UnitOfWorkFactory) -> None:
-        self._uow_factory = uow_factory
+    def __init__(self, transactions: BookTransactions) -> None:
+        self._transactions = transactions
 
     def execute(self, query: ListBooksQuery) -> ListBooksResult:
         if not 1 <= query.limit <= MAX_LIST_LIMIT:
@@ -35,8 +36,8 @@ class ListBooksService:
         title = _normalize_filter(query.title, "Title", MAX_TITLE_LENGTH)
         author = _normalize_filter(query.author, "Author", MAX_AUTHOR_LENGTH)
 
-        with self._uow_factory() as uow:
-            books = uow.books.list_books(
+        def work(repository: BookRepository) -> ListBooksResult:
+            books = repository.list_books(
                 title=title, author=author, limit=query.limit + 1, cursor=query.cursor
             )
             has_extra = len(books) > query.limit
@@ -52,10 +53,10 @@ class ListBooksService:
             previous_cursor = BookPageCursor(page[0].isbn, "previous")
             if backward:
                 has_previous = has_extra
-                has_next = uow.books.has_books(title=title, author=author, cursor=next_cursor)
+                has_next = repository.has_books(title=title, author=author, cursor=next_cursor)
             else:
                 has_next = has_extra
-                has_previous = query.cursor is not None and uow.books.has_books(
+                has_previous = query.cursor is not None and repository.has_books(
                     title=title, author=author, cursor=previous_cursor
                 )
 
@@ -74,6 +75,8 @@ class ListBooksService:
                 next_cursor=next_cursor if has_next else None,
                 previous_cursor=previous_cursor if has_previous else None,
             )
+
+        return self._transactions.run(work)
 
 
 def _normalize_filter(value: str | None, field: str, max_length: int) -> str | None:

@@ -19,16 +19,16 @@ Use descriptive type aliases for complex annotations when the name makes a contr
 understand. Use Python's `type` statement and `PascalCase` names. Define each alias beside the
 contract that owns its meaning, rather than in a generic module collecting unrelated types.
 
-For example, `application/unit_of_work.py` defines:
+For example, `application/books/transactions.py` defines:
 
 ```python
-type UnitOfWorkFactory = Callable[[], UnitOfWork]
+type BookTransactionWork[T] = Callable[[BookRepository], T]
 ```
 
-Use `UnitOfWorkFactory` consistently in service constructors, provider return annotations,
-dependency registrations, and container lookups. The alias describes a callable that takes no
-arguments and returns a unit of work. It does not construct the callable or change transaction
-ownership. A lambda or `partial` can implement that contract; neither replaces its type annotation.
+Use `BookTransactionWork[T]` for transaction callback annotations. It describes a callable that
+receives the transaction-bound repository and returns a result of type `T`; it does not open a
+transaction. `BookTransactions.run` owns the commit-on-success contract. Services receive that
+protocol through ordinary constructor injection, with Dishka binding the concrete adapter.
 
 This is a deliberate readability convention for future code. Keep simple annotations such as
 `str`, `Settings`, and `list[Book]` direct unless an alias adds useful meaning. Do not hide framework
@@ -40,7 +40,7 @@ annotations at runtime, verify that its registration and resolution support the 
 - Give each module and class one coherent responsibility. Separate business validation, orchestration, transport, and persistence.
 - Keep functions understandable through names and control flow. Extract a helper when it names a distinct responsibility or removes meaningful duplication.
 - Prefer explicit constructor dependencies. Do not hide database access or service lookup inside core code.
-- Use small `Protocol` ports for capabilities a use case consumes. Follow the existing repository and unit-of-work boundaries.
+- Use small `Protocol` ports for capabilities a use case consumes. Follow the existing repository and transaction boundaries.
 - New adapters must honor the same return, failure, and transaction semantics as their ports. Type compatibility alone is insufficient.
 - Prefer composition to inheritance for sharing behavior. Do not create base classes, factories, or interfaces without a current need.
 - Extend behavior at the owning boundary. Avoid speculative extension points and abstractions that have no caller.
@@ -75,7 +75,7 @@ For example, a create-book use case constructs `ISBN(command.isbn)` and calls `B
 - Catch specific errors where recovery or translation is possible. Do not silently swallow failures or turn unexpected errors into successful responses.
 - Keep HTTP statuses and framework exceptions out of domain and application code.
 - Keep SQLAlchemy exceptions out of port contracts. Translate expected persistence failures at the adapter boundary when implementing that behavior.
-- Use context managers for resource lifecycles. Preserve explicit commit and rollback ownership described in [architecture](architecture.md).
+- Use context managers for resource lifecycles. Preserve callback transaction ownership described in [architecture](architecture.md).
 
 ## Readability and scope
 

@@ -1,21 +1,22 @@
 from bookstore_api.application.books.commands import UpdateBookCommand
 from bookstore_api.application.books.errors import BookNotFoundError, BookVersionConflictError
 from bookstore_api.application.books.get_book_details import GetBookDetailsResult
-from bookstore_api.application.unit_of_work import UnitOfWorkFactory
+from bookstore_api.application.books.ports import BookRepository
+from bookstore_api.application.books.transactions import BookTransactions
 
 
 class UpdateBookService:
-    _uow_factory: UnitOfWorkFactory
+    _transactions: BookTransactions
 
-    def __init__(self, uow_factory: UnitOfWorkFactory) -> None:
-        self._uow_factory = uow_factory
+    def __init__(self, transactions: BookTransactions) -> None:
+        self._transactions = transactions
 
     def execute(self, command: UpdateBookCommand) -> GetBookDetailsResult:
         if command.title is None and command.author is None:
             raise ValueError("At least one book detail must be supplied")
 
-        with self._uow_factory() as uow:
-            book = uow.books.get_by_id(command.book_id)
+        def work(repository: BookRepository) -> GetBookDetailsResult:
+            book = repository.get_by_id(command.book_id)
             if book is None:
                 raise BookNotFoundError(f"Book with id {command.book_id} not found")
             if (
@@ -25,8 +26,7 @@ class UpdateBookService:
                 raise BookVersionConflictError("The book has changed; retrieve it before updating")
 
             book.revise_details(title=command.title, author=command.author)
-            version = uow.books.update(book)
-            uow.commit()
+            version = repository.update(book)
             return GetBookDetailsResult(
                 book_id=book.id,
                 isbn=book.isbn,
@@ -34,3 +34,5 @@ class UpdateBookService:
                 author=book.author,
                 version=version,
             )
+
+        return self._transactions.run(work)
